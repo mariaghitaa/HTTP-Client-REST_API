@@ -29,7 +29,7 @@ TEXT_INDENT = "    "
 RE_SUCCESS = re.compile(r"^.*((?:^|\W)succ?ess?|(?:^|\W)ok(?:$|\W)|(?:^|\W)okay).*$", re.IGNORECASE)
 RE_ERROR = re.compile(r"^.*((?:^|\W)err?oa?r|(?:^|\W)fail|(?:^|\W)esuat).*$", re.IGNORECASE)
 # Regexes for extracting useful information
-RE_EXTRACT_LIST_ITEM = r"^\s*(?:movie)\s*?#([0-9+])(?:\s*:)?\s*(.+)\s*"
+RE_EXTRACT_LIST_ITEM = r"^\s*(?:movie\s*)?#([0-9]+)(?:\s*:)?\s*(.+)\s*"
 RE_EXTRACT_OBJ_FIELD = r"^\s*%s[ \t\f\v]*[=:][ \t\f\v]*([^\r\n]+)\s*?|\"%s\"\s*:\s*(?:\"([^\"]+)|([0-9]+))"
 
 
@@ -86,7 +86,7 @@ def expect_send_params(p, xvars):
         xseen.add(keys[idx])
 
 def expect_flush_output(p):
-    i = p.expect([RE_SUCCESS, RE_ERROR, pexpect.TIMEOUT, pexpect.EOF])
+    i = p.expect([RE_ERROR, pexpect.TIMEOUT, pexpect.EOF])
     buf = p.before
     if i == 0 and p.before:
         p.expect(r'.+')
@@ -107,8 +107,8 @@ def expect_print_output(p):
     color_print(wrap_test_output(text.strip()), **color_args)
 
 def extract_list_items(output):
-    matches = re.findall(RE_EXTRACT_LIST_ITEM, output, re.I)
-    return [(val[0], val[1]) for val in matches]
+    matches = re.findall(RE_EXTRACT_LIST_ITEM, output, re.I | re.M)
+    return [(val[0].strip(), val[1].strip()) for val in matches]
 
 def extract_object_field_vals(output, field):
     matches = re.findall(RE_EXTRACT_OBJ_FIELD % (field, field), output, re.I)
