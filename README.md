@@ -31,7 +31,7 @@ Invoke the checker on your client's compiled executable:
 python3 checker.py --help 
 # run the checker using default settings:
 python3 checker.py ../path/to/client
-# Hint: supply a custom username:password (make sure to use something unique)
+# Hint: you MUST supply an admin username:password
 python3 checker.py --admin 'myadminuser:hunter2' ../path-to/client
 ```
 
