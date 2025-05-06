@@ -27,8 +27,8 @@ EXPECT_SEP = "="  # field separator for input
 TEXT_INDENT = "    "
 
 # Regex for parsing ERROR/SUCCESS command statuses
-RE_SUCCESS = re.compile(r"^.*((?:^|\W)succ?ess?|(?:^|\W)ok(?:$|\W)|(?:^|\W)okay).*$", re.IGNORECASE)
-RE_ERROR = re.compile(r"^.*((?:^|\W)err?oa?r|(?:^|\W)fail|(?:^|\W)esuat).*$", re.IGNORECASE)
+RE_SUCCESS = re.compile(r"^.*((?:^|\W)succ?ess?).*$", re.IGNORECASE)
+RE_ERROR = re.compile(r"^.*((?:^|\W)err?oa?r|(?:^|\W)fail).*$", re.IGNORECASE)
 # Regexes for extracting useful information
 RE_EXTRACT_LIST_ITEM = r"^\s*(?:movie\s*)?#([0-9]+)(?:\s*:)?\s*(.+)\s*"
 RE_EXTRACT_OBJ_FIELD = r"^\s*%s[ \t\f\v]*[=:][ \t\f\v]*([^\r\n]+)\s*?|\"%s\"\s*:\s*(?:\"([^\"]+)|([0-9]+))"
@@ -53,10 +53,9 @@ def color_print(text, fg="white", bg=None, style="normal", stderr=False, newline
     bg = ("" if not bg else ";" + str(40 + COLORS.index(bg.lower())))
     style = str(STYLES.index(style.lower()))
     text = '\033[{style};{fg}{bg}m{text}\033[0;0m'.format(text=text, fg=fg, bg=bg, style=style)
-    if stderr:
-        sys.stderr.write(text + ("\n" if newline else ""))
-    else:
-        sys.stdout.write(text + ("\n" if newline else ""))
+    if newline:
+        text += "\n"
+    (sys.stderr if stderr else sys.stdout).write(text)
 
 class ExpectInputWrapper:
     """ Utility IO class used for prefixing the debug output. """
@@ -93,20 +92,24 @@ def expect_send_params(p, xvars):
             raise CheckerException("Client did not ask the following fields: " + 
                                    ", ".join(set(keys) - xseen))
 
-def expect_flush_output(p):
+def expect_flush_output(p, ignore_error=False):
     i = p.expect([pexpect.TIMEOUT, pexpect.EOF, RE_ERROR])
     buf = p.before
     if i == 0 and p.before:
         p.expect(r'.+')
+    if i == 2 and not ignore_error:
+        raise CheckerException(f"Program returned error: {p.after.strip()}")
     return buf
 
-def expect_print_output(p):
+def expect_print_output(p, ignore_error=False):
     res = p.expect([RE_SUCCESS, RE_ERROR, pexpect.TIMEOUT])
     color_args = {}
     text = p.after
     if res == 0:
         color_args = {"fg": "green"}
     elif res == 1:
+        if not ignore_error:
+            raise CheckerException(f"Program returned error: {text.strip()}")
         color_args = {"fg": "red"}
     else:
         text = p.before or "<no output>"
@@ -234,7 +237,7 @@ def do_get_movies(p, xargs):
         if len(xargs["movie_objs"]) != expect_count:
             raise CheckerException("Movies count mismatch: %s != %s" % 
                                    (len(xargs["movie_objs"]), expect_count))
-        color_print(wrap_test_output("OKAY: count=%i" % expect_count), fg="green", style="bold")
+        color_print(wrap_test_output("PASSED: count=%i" % expect_count), fg="green", style="bold")
 
 def do_add_movie(p, xargs):
     existing_titles = [obj[1] for obj in xargs.get("movie_objs", [])]
@@ -265,7 +268,7 @@ def do_get_movie(p, xargs):
     expected = xargs.get("expect_movie", False)
     if expected:
         check_object_fields(obj, expected)
-        color_print(wrap_test_output("OKAY: fields match!"), fg="green", style="bold")
+        color_print(wrap_test_output("PASSED: fields match!"), fg="green", style="bold")
 
 def do_delete_all_movies(p, xargs):
     objs = xargs.get("movie_objs")
@@ -287,7 +290,7 @@ def do_get_collections(p, xargs):
         if len(xargs["collection_objs"]) != expect_count:
             raise CheckerException("Collections count mismatch: %s != %s" % 
                                    (len(xargs["collection_objs"]), expect_count))
-        color_print(wrap_test_output("OKAY: count=%i" % expect_count), fg="green", style="bold")
+        color_print(wrap_test_output("PASSED: count=%i" % expect_count), fg="green", style="bold")
     expect_titles = xargs.get("expect_title", None)
     if expect_titles:
         existing_titles = [obj[1] for obj in xargs.get("collection_objs", [])]
@@ -325,13 +328,13 @@ def do_get_collection(p, xargs):
     expected_fields = xargs.get("expect_collection", False)
     if expected_fields:
         check_object_fields(obj, expected_fields)
-        color_print(wrap_test_output("OKAY: fields match!"), fg="green", style="bold")
+        color_print(wrap_test_output("PASSED: fields match!"), fg="green", style="bold")
     expected_movies = xargs.get("expect_movies", False)
     if expected_movies:
         movie_titles = [x[1] for x in obj["movies"]]
         if (set(movie_titles) != set(expected_movies)):
             raise CheckerException(f"Collection movies mismatch: {movie_titles} != {expected_movies}!")
-        color_print(wrap_test_output("OKAY: movies match!"), fg="green", style="bold")
+        color_print(wrap_test_output("PASSED: movies match!"), fg="green", style="bold")
 
 def do_delete_collection(p, xargs):
     collection_id = get_object_id_by_idx("collection", xargs)
