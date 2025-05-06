@@ -175,7 +175,8 @@ def do_get_users(p, xargs):
     p.sendline("get_users")
     buf = expect_flush_output(p)
     xargs["user_objs"] = extract_list_items(buf)
-    print(wrap_test_output("Extracted users: \n" + str(xargs["user_objs"]) + "\n"))
+    if xargs.get("debug"):
+        color_print(wrap_test_output("Extracted users: \n" + str(xargs["user_objs"])), fg="white")
     user_found = False
     for obj in xargs["user_objs"]:
         user_params = obj[1].split(":")
@@ -226,7 +227,8 @@ def do_get_movies(p, xargs):
     p.sendline("get_movies")
     buf = expect_flush_output(p)
     xargs["movie_objs"] = extract_list_items(buf)
-    print(wrap_test_output("Extracted movies: \n" + str(xargs["movie_objs"])))
+    if xargs.get("debug"):
+        color_print(wrap_test_output("Extracted movies: \n" + str(xargs["movie_objs"])), fg="white")
     expect_count = xargs.get("expect_count", False)
     if type(expect_count) is int:
         if len(xargs["movie_objs"]) != expect_count:
@@ -258,7 +260,8 @@ def do_get_movie(p, xargs):
     expect_send_params(p, {"id": movie_id})
     buf = expect_flush_output(p)
     obj = extract_object_fields(buf, ("title", "description", "year", "rating"))
-    print(wrap_test_output("Extracted object: %s" % obj))
+    if xargs.get("debug"):
+        color_print(wrap_test_output("Extracted object: %s" % obj), fg="white")
     expected = xargs.get("expect_movie", False)
     if expected:
         check_object_fields(obj, expected)
@@ -277,7 +280,8 @@ def do_get_collections(p, xargs):
     p.sendline("get_collections")
     buf = expect_flush_output(p)
     xargs["collection_objs"] = extract_list_items(buf)
-    print(wrap_test_output("Extracted collections: \n" + str(xargs["collection_objs"])))
+    if xargs.get("debug"):
+        color_print(wrap_test_output("Extracted collections: \n" + str(xargs["collection_objs"])), fg="white")
     expect_count = xargs.get("expect_count", False)
     if type(expect_count) is int:
         if len(xargs["collection_objs"]) != expect_count:
@@ -316,7 +320,8 @@ def do_get_collection(p, xargs):
     buf = expect_flush_output(p)
     obj = extract_object_fields(buf, ("title", "owner"))
     obj["movies"] = extract_list_items(buf)
-    print(wrap_test_output("Extracted object: %s" % obj))
+    if xargs.get("debug"):
+        color_print(wrap_test_output("Extracted object: %s" % obj), fg="white")
     expected_fields = xargs.get("expect_collection", False)
     if expected_fields:
         check_object_fields(obj, expected_fields)
