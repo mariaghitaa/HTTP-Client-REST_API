@@ -130,13 +130,14 @@ def extract_object_fields(output, fields):
         obj[field] = vals[0]
     return obj
 
-def get_object_id_by_idx(name, xargs):
+def get_object_id_by_idx(name, xargs, idx=None):
     objs = xargs.get(f"{name}_objs")
-    idx = xargs.get(f"{name}_idx")
+    if idx is None:
+        idx = xargs.get(f"{name}_idx")
     if not objs:
-        raise CheckerException("No objects found!")
+        raise CheckerException(f"No {name} objects found!")
     if idx >= len(objs):
-        raise CheckerException(f"No object with index #{idx}")
+        raise CheckerException(f"No {name} with index #{idx}")
     return objs[idx][0]
 
 def check_object_fields(obj, expected):
@@ -278,10 +279,12 @@ def do_add_collection(p, xargs):
     p.sendline("add_collection")
     collection_struct = {
         "title": collection_obj.get("title", ""),
-        "num_movies": len(collection_obj.get("movies", [])),
+        "num_movies": len(collection_obj.get("movie_idx", [])),
     }
-    for idx, movie_id in enumerate(collection_obj.get("movies", [])):
-        collection_struct[r"movie\[\s*" + str(idx) + r"\s*\]"] = movie_id
+    movies_ids = [get_object_id_by_idx("movie", xargs, idx=idx)
+        for idx in collection_obj.get("movie_idx", [])]
+    for idx, movie_id in enumerate(movies_ids):
+        collection_struct[r"movie_id\[\s*" + str(idx) + r"\s*\]"] = movie_id
     expect_send_params(p, collection_struct)
     expect_print_output(p)
 
@@ -293,6 +296,16 @@ def do_get_collection(p, xargs):
     obj = extract_object_fields(buf, ("title", "owner"))
     obj["movies"] = extract_list_items(buf)
     print(wrap_test_output("Extracted object: %s" % obj))
+    expected_fields = xargs.get("expect_collection", False)
+    if expected_fields:
+        check_object_fields(obj, expected_fields)
+        color_print(wrap_test_output("OKAY: fields match!"), fg="green", style="bold")
+    expected_movies = xargs.get("expect_movies", False)
+    if expected_movies:
+        movie_titles = [x[1] for x in obj["movies"]]
+        if (set(movie_titles) != set(expected_movies)):
+            raise CheckerException(f"Collection movies mismatch: {movie_titles} != {expected_movies}!")
+        color_print(wrap_test_output("OKAY: movies match!"), fg="green", style="bold")
 
 def do_delete_collection(p, xargs):
     collection_id = get_object_id_by_idx("collection", xargs)
@@ -377,9 +390,13 @@ SCRIPTS = {
         ("add_movie", {"movie_obj": SAMPLE_MOVIES[0]}),
         ("add_movie", {"movie_obj": SAMPLE_MOVIES[1]}),
         ("add_movie", {"movie_obj": SAMPLE_MOVIES[2]}),
-        ("add_collection", {"collection_obj": {"title": "Top IMDB", "movie_ids": [0, 2]}}),
-        ("add_collection", {"collection_obj": {"title": "Must See", "movie_ids": [1, 2]}}),
+        ("get_movies", {"expect_count": 3}),
+        ("add_collection", {"collection_obj": {"title": "Top IMDB", "movie_idx": [0, 2]}}),
+        ("add_collection", {"collection_obj": {"title": "Must See", "movie_idx": [1, 2]}}),
         ("get_collections", {"expect_count": 2, "expect_titles": ["Top IMDB", "Must See"]}),
+        ("get_collection", {"collection_idx": 0, "expect_collection": {"title": "Top IMDB"},
+                            "expect_movies": [SAMPLE_MOVIES[0]["title"],
+                                              SAMPLE_MOVIES[2]["title"]]}),
         ("delete_collection", {"collection_idx": 1}),
         ("get_collections", {"expect_count": 1, "expect_titles": ["Top IMDB"]}),
         ("logout", {}), ("exit", {}), 
