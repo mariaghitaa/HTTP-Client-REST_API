@@ -139,9 +139,8 @@ def get_object_id_by_idx(name, xargs):
         raise CheckerException(f"No object with index #{idx}")
     return objs[idx][0]
 
-def check_object_fields(output, expected):
+def check_object_fields(obj, expected):
     fields = expected.keys()
-    obj = extract_object_fields(output, fields)
     for field in fields:
         val = obj.get(field)
         if str(val) != str(expected[field]):
@@ -174,6 +173,16 @@ def do_get_users(p, xargs):
     xargs["user_objs"] = extract_list_items(buf)
     print(wrap_test_output("Extracted users: \n" + str(xargs["user_objs"]) + "\n"))
 
+def do_delete_all_users(p, xargs):
+    objs = xargs.get("user_objs")
+    if not objs and not xargs.get("delete_ignore", False):
+        raise CheckerException("No users found!")
+    for obj in objs:
+        user_params = obj[1].split(":")
+        if (not xargs.get("delete_pattern") or
+                re.match(xargs.get("delete_pattern"), user_params[0])):
+            do_delete_user(p, { "normal_user": { "username": user_params[0] } })
+
 def do_logout_admin(p, xargs):
     p.sendline("logout_admin")
     expect_print_output(p)
@@ -195,7 +204,7 @@ def do_get_movies(p, xargs):
     p.sendline("get_movies")
     buf = expect_flush_output(p)
     xargs["movie_objs"] = extract_list_items(buf)
-    print(wrap_test_output("Extracted movies: \n" + str(xargs["movie_objs"]) + "\n"))
+    print(wrap_test_output("Extracted movies: \n" + str(xargs["movie_objs"])))
     expect_count = xargs.get("expect_count", False)
     if type(expect_count) is int:
         if len(xargs["movie_objs"]) != expect_count:
@@ -226,9 +235,11 @@ def do_get_movie(p, xargs):
     p.sendline("get_movie")
     expect_send_params(p, {"id": movie_id})
     buf = expect_flush_output(p)
+    obj = extract_object_fields(buf, ("title", "description", "year", "rating"))
+    print(wrap_test_output("Extracted object: %s" % obj))
     expected = xargs.get("expect_movie", False)
     if expected:
-        check_object_fields(buf, expected)
+        check_object_fields(obj, expected)
         color_print(wrap_test_output("OKAY: fields match!"), fg="green", style="bold")
 
 def do_delete_all_movies(p, xargs):
@@ -255,6 +266,7 @@ ACTIONS = {
     "login_admin": do_login_admin,
     "add_user": do_add_user,
     "get_users": do_get_users,
+    "delete_all_users": do_delete_all_users,
     "login": do_login,
     "get_access": do_get_access,
     "get_movies": do_get_movies,
@@ -298,9 +310,17 @@ SCRIPTS = {
         ("get_movies", {"expect_count": 2}),
         ("get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}),
         ("delete_movie", {"movie_idx": 1}),
+        ("get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}),
+        ("get_movies", {"expect_count": 1}),
         ("logout", {}), ("exit", {}), 
     ],
 
+    # cleans up all test_* users from your account
+    "CLEANUP": [
+        ("login_admin", {}),
+        ("get_users", {}), ("delete_all_users", { "delete_pattern": r"^test_.+" }),
+        ("logout_admin", {}),
+    ],
     # interactive shell
     "SHELL": [
         ("register", {}), ("login", {}), ("get_access", {}),
