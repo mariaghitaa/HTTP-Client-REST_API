@@ -78,12 +78,17 @@ def normalize_user(user_type, user_data, randomize=False):
 
 def expect_send_params(p, xvars):
     keys = list(xvars.keys())
-    xpatterns =  [(r"(?i)(" + kw + r"|" + kw.replace("_", r"[ \t]+") + ")[ \t\f\v]*" + EXPECT_SEP + r"[ \t\f\v]*") for kw in keys]
+    xpatterns =  [(r"(?i)\b(" + kw + r")\s*" + EXPECT_SEP + r"\s*") for kw in keys]
     xseen = set()
     while xseen != set(keys):
-        idx = p.expect(xpatterns)
-        p.sendline(str(xvars.get(keys[idx])))
-        xseen.add(keys[idx])
+        try:
+            idx = p.expect(xpatterns)
+            p.sendline(str(xvars.get(keys[idx])))
+            xseen.add(keys[idx])
+        except pexpect.exceptions.TIMEOUT:
+            raise CheckerException("Client did not ask the following fields: " + 
+                                   ", ".join(set(keys) - xseen))
+
 
 def expect_flush_output(p):
     i = p.expect([RE_ERROR, pexpect.TIMEOUT, pexpect.EOF])
@@ -111,7 +116,7 @@ def extract_list_items(output):
     return [(val[0].strip(), val[1].strip()) for val in matches]
 
 def extract_object_field_vals(output, field):
-    matches = re.findall(RE_EXTRACT_OBJ_FIELD % (field, field), output, re.I)
+    matches = re.findall(RE_EXTRACT_OBJ_FIELD % (field, field), output, re.I | re.M)
     return [val[0] or val[1] or val[2] for val in matches]
 
 def extract_object_fields(output, fields):
@@ -150,12 +155,17 @@ def do_login_admin(p, xargs):
 
 def do_add_user(p, xargs):
     p.sendline("add_user")
-    expect_send_params(p, xargs["normal_user"])
+    expect_send_params(p, {
+        "username": xargs["normal_user"]["username"], 
+        "password": xargs["normal_user"]["password"]
+    })
     expect_print_output(p)
 
 def do_delete_user(p, xargs):
     p.sendline("delete_user")
-    expect_send_params(p, xargs["normal_user"])
+    expect_send_params(p, {
+        "username": xargs["normal_user"]["username"], 
+    })
     expect_print_output(p)
 
 def do_get_users(p, xargs):
@@ -361,6 +371,7 @@ if __name__ == "__main__":
         xargs = vars(args)
         xargs["admin_user"] = normalize_user("admin_user", xargs.get("admin_user"))
         xargs["normal_user"] = normalize_user("normal_user", xargs.get("normal_user"), True)
+        xargs["normal_user"]["admin_username"] = xargs["admin_user"]["username"]
         if args.debug:
             print("xargs: ", str(xargs))
         run_tasks(p, xargs)
