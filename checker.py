@@ -251,6 +251,55 @@ def do_delete_all_movies(p, xargs):
         expect_send_params(p, {"id": obj[0]})
         expect_print_output(p)
 
+def do_get_collections(p, xargs):
+    p.sendline("get_collections")
+    buf = expect_flush_output(p)
+    xargs["collection_objs"] = extract_list_items(buf)
+    print(wrap_test_output("Extracted collections: \n" + str(xargs["collection_objs"])))
+    expect_count = xargs.get("expect_count", False)
+    if type(expect_count) is int:
+        if len(xargs["collection_objs"]) != expect_count:
+            raise CheckerException("Collections count mismatch: %s != %s" % 
+                                   (len(xargs["collection_objs"]), expect_count))
+        color_print(wrap_test_output("OKAY: count=%i" % expect_count), fg="green", style="bold")
+    expect_titles = xargs.get("expect_title", None)
+    if expect_titles:
+        existing_titles = [obj[1] for obj in xargs.get("collection_objs", [])]
+        for exp_title in expect_titles:
+            if exp_title not in existing_titles:
+                raise CheckerException(f"Collection not found: '{exp_title}'")
+
+def do_add_collection(p, xargs):
+    existing_titles = [obj[1] for obj in xargs.get("collection_objs", [])]
+    collection_obj = xargs.get("collection_obj", {})
+    if collection_obj["title"] in existing_titles:
+        color_print(wrap_test_output("SKIP: object already exists!"), fg="yellow")
+        return
+    p.sendline("add_collection")
+    collection_struct = {
+        "title": collection_obj.get("title", ""),
+        "num_movies": len(collection_obj.get("movies", [])),
+    }
+    for idx, movie_id in enumerate(collection_obj.get("movies", [])):
+        collection_struct[r"movie\[\s*" + str(idx) + r"\s*\]"] = movie_id
+    expect_send_params(p, collection_struct)
+    expect_print_output(p)
+
+def do_get_collection(p, xargs):
+    collection_id = get_object_id_by_idx("collection", xargs)
+    p.sendline("get_collection")
+    expect_send_params(p, {"id": collection_id})
+    buf = expect_flush_output(p)
+    obj = extract_object_fields(buf, ("title", "owner"))
+    obj["movies"] = extract_list_items(buf)
+    print(wrap_test_output("Extracted object: %s" % obj))
+
+def do_delete_collection(p, xargs):
+    collection_id = get_object_id_by_idx("collection", xargs)
+    p.sendline("delete_collection")
+    expect_send_params(p, {"id": collection_id})
+    expect_print_output(p)
+
 def do_exit(p, xargs):
     if xargs.get("dont_exit", False):
         return
@@ -274,6 +323,10 @@ ACTIONS = {
     "add_movie": do_add_movie,
     "delete_movie": do_delete_movie,
     "delete_all_movies": do_delete_all_movies,
+    "add_collection": do_add_collection,
+    "get_collections": do_get_collections,
+    "get_collection": do_get_collection,
+    "delete_collection": do_delete_collection,
     "logout_admin": do_logout_admin,
     "logout": do_logout,
     "exit": do_exit,
@@ -298,8 +351,8 @@ _movie_test_fields = lambda idx: {key: SAMPLE_MOVIES[idx][key] for key in ("titl
 
 
 SCRIPTS = {
-    "ALL": ["full"],
-    "full": [
+    "ALL": ["movies", "collections"],
+    "movies": [
         ("login_admin", {}),  # use CLI-provided admin
         ("add_user", {}), ("get_users", {}),
         ("logout_admin", {}),
@@ -314,6 +367,23 @@ SCRIPTS = {
         ("get_movies", {"expect_count": 1}),
         ("logout", {}), ("exit", {}), 
     ],
+    "collections": [
+        ("login_admin", {}),  # use CLI-provided admin
+        ("add_user", {}), ("get_users", {}),
+        ("logout_admin", {}),
+        ("login", {}), ("get_access", {}),
+        ("get_movies", {"expect_count": 0}),
+        ("get_collections", {"expect_count": 0}),
+        ("add_movie", {"movie_obj": SAMPLE_MOVIES[0]}),
+        ("add_movie", {"movie_obj": SAMPLE_MOVIES[1]}),
+        ("add_movie", {"movie_obj": SAMPLE_MOVIES[2]}),
+        ("add_collection", {"collection_obj": {"title": "Top IMDB", "movie_ids": [0, 2]}}),
+        ("add_collection", {"collection_obj": {"title": "Must See", "movie_ids": [1, 2]}}),
+        ("get_collections", {"expect_count": 2, "expect_titles": ["Top IMDB", "Must See"]}),
+        ("delete_collection", {"collection_idx": 1}),
+        ("get_collections", {"expect_count": 1, "expect_titles": ["Top IMDB"]}),
+        ("logout", {}), ("exit", {}), 
+    ],
 
     # cleans up all test_* users from your account
     "CLEANUP": [
@@ -323,7 +393,10 @@ SCRIPTS = {
     ],
     # interactive shell
     "SHELL": [
-        ("register", {}), ("login", {}), ("get_access", {}),
+        ("login_admin", {}),
+        ("add_user", {}), ("get_users", {}),
+        ("logout_admin", {}),
+        ("login", {}), ("get_access", {}),
         ("shell", {}),
         ("logout", {}), ("exit", {}), 
     ],
