@@ -7,7 +7,8 @@ This repository contains checker for the PCom HTTP client homework.
 Dependencies:
 
 - Python >= 3.7;
-- [`pexpect`](https://pexpect.readthedocs.io/en/stable/) (third party Python package);
+- [`pexpect`](https://pexpect.readthedocs.io/en/stable/) (third party package for console automation);
+- [`pyyaml`](https://pypi.org/project/PyYAML/) (third party package for YAML);
 
 It is highly recommended to use a VirtualEnv, either by using the bundled
 Makefile or by manually installing the dependencies:
@@ -31,7 +32,7 @@ Invoke the checker on your client's compiled executable:
 python3 checker.py --help 
 # run the checker using default settings:
 python3 checker.py ../path/to/client
-# Hint: you MUST supply an admin username:password
+# you MUST supply a valid admin user & password!
 python3 checker.py --admin 'myadminuser:hunter2' ../path-to/client
 ```
 
@@ -39,18 +40,17 @@ The default test script uses the admin user to create a random normal test user.
 This will ensure a clean slate while doing all other tests (since the server 
 persists all edits inside a database).
 
-Alternately, you can use e.g., `--script delete_movies` if you have a functioning
-implementation for `get_movies` and `delete_movie` to quickly cleanup your
-associated database.
+Alternately, you can use e.g., `--script CLEANUP` if you have a functioning
+implementation for `get_users` and `delete_user` to quickly cleanup your
+associated users & other database items.
 
 Also make sure to check out [the source code](./checker.py) for the
 actual details about the script(s) being tested.
 
-<span style="color: #A33">**Warning**: This script is just an instrument used
-by our team to automate the homework verification process.
+<span style="color: #A33">**Warning**: This _alpha version!_ script is just an 
+instrument used by our team to automate the homework verification process.
 If any bugs affecting its effectiveness are found, we reserve the right to
 correct them at any time (you will be notified when this is the case).
 When in doubt, use the homework text as the rightful source of truth and use the
 Moodle Forum to ask any questions.
 </span>
-
