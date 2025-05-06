@@ -19,6 +19,7 @@ import re
 import textwrap
 
 import pexpect
+import yaml
 
 
 EXPECT_TIMEOUT = 1  # 1 second should be enough...
@@ -31,6 +32,9 @@ RE_ERROR = re.compile(r"^.*((?:^|\W)err?oa?r|(?:^|\W)fail|(?:^|\W)esuat).*$", re
 # Regexes for extracting useful information
 RE_EXTRACT_LIST_ITEM = r"^\s*(?:movie\s*)?#([0-9]+)(?:\s*:)?\s*(.+)\s*"
 RE_EXTRACT_OBJ_FIELD = r"^\s*%s[ \t\f\v]*[=:][ \t\f\v]*([^\r\n]+)\s*?|\"%s\"\s*:\s*(?:\"([^\"]+)|([0-9]+))"
+
+# tests object; loaded at runtime
+T = {"scripts": {}}
 
 
 class CheckerException(Exception):
@@ -89,9 +93,8 @@ def expect_send_params(p, xvars):
             raise CheckerException("Client did not ask the following fields: " + 
                                    ", ".join(set(keys) - xseen))
 
-
 def expect_flush_output(p):
-    i = p.expect([RE_ERROR, pexpect.TIMEOUT, pexpect.EOF])
+    i = p.expect([pexpect.TIMEOUT, pexpect.EOF, RE_ERROR])
     buf = p.before
     if i == 0 and p.before:
         p.expect(r'.+')
@@ -173,6 +176,12 @@ def do_get_users(p, xargs):
     buf = expect_flush_output(p)
     xargs["user_objs"] = extract_list_items(buf)
     print(wrap_test_output("Extracted users: \n" + str(xargs["user_objs"]) + "\n"))
+    user_found = False
+    for obj in xargs["user_objs"]:
+        user_params = obj[1].split(":")
+        if user_params[0] == xargs["normal_user"]["username"]:
+            user_found = True
+    xargs["_user_ensured"] = user_found
 
 def do_delete_all_users(p, xargs):
     objs = xargs.get("user_objs")
@@ -200,6 +209,18 @@ def do_logout(p, xargs):
 def do_get_access(p, xargs):
     p.sendline("get_access")
     expect_print_output(p)
+
+def ensure_user_access(p, xargs):
+    ensure_script = [ ["login", {}], ["get_access", {}] ]
+    if not xargs.get("_user_ensured", False):
+        ensure_script = [
+            ["login_admin", {}], ["add_user", {}],
+            ["get_users", {}], ["logout_admin", {}],
+        ] + ensure_script
+    else:
+        print(wrap_test_output("User already ensured!"))
+    nxargs = dict(xargs, script=ensure_script, dont_exit=True)
+    run_tasks(p, nxargs)
 
 def do_get_movies(p, xargs):
     p.sendline("get_movies")
@@ -326,113 +347,42 @@ def interactive_shell(p, xargs):
 
 ACTIONS = {
     "login_admin": do_login_admin,
-    "add_user": do_add_user,
-    "get_users": do_get_users,
+    "add_user": do_add_user, "get_users": do_get_users,
     "delete_all_users": do_delete_all_users,
-    "login": do_login,
-    "get_access": do_get_access,
-    "get_movies": do_get_movies,
-    "get_movie": do_get_movie,
-    "add_movie": do_add_movie,
-    "delete_movie": do_delete_movie,
-    "delete_all_movies": do_delete_all_movies,
-    "add_collection": do_add_collection,
-    "get_collections": do_get_collections,
-    "get_collection": do_get_collection,
-    "delete_collection": do_delete_collection,
-    "logout_admin": do_logout_admin,
-    "logout": do_logout,
-    "exit": do_exit,
-    "shell": interactive_shell,
+    "login": do_login, "get_access": do_get_access,
+    "ensure_user_access": ensure_user_access,
+    "get_movies": do_get_movies, "get_movie": do_get_movie, "add_movie": do_add_movie,
+    "delete_movie": do_delete_movie, "delete_all_movies": do_delete_all_movies,
+    "add_collection": do_add_collection, "get_collections": do_get_collections,
+    "get_collection": do_get_collection, "delete_collection": do_delete_collection,
+    "logout_admin": do_logout_admin, "logout": do_logout,
+    "exit": do_exit, "shell": interactive_shell,
 }
 
-SAMPLE_MOVIES = [
-    {
-        "title": "The Dark Knight", "year": 2008,
-        "description": "Batman saves the world, Joker dies IRL, oh wait", "rating": 9,
-    },
-    {
-        "title": "Idiocracy", "year": 2006,
-        "description": "Nostradamus was so wrong... this nails it pretty well for our future", "rating": 6.5,
-    },
-    {
-        "title": "The Lord of the Rings 1-3", "year": 2001,
-        "description": "It's the homework that's never started as takes longest to finish.", "rating": 6.5,
-    },
-]
-_movie_test_fields = lambda idx: {key: SAMPLE_MOVIES[idx][key] for key in ("title", "description", "year")}
-
-
-SCRIPTS = {
-    "ALL": ["movies", "collections"],
-    "movies": [
-        ("login_admin", {}),  # use CLI-provided admin
-        ("add_user", {}), ("get_users", {}),
-        ("logout_admin", {}),
-        ("login", {}), ("get_access", {}),
-        ("get_movies", {"expect_count": False}),
-        ("add_movie", {"movie_obj": SAMPLE_MOVIES[0]}),
-        ("add_movie", {"movie_obj": SAMPLE_MOVIES[1]}),
-        ("get_movies", {"expect_count": 2}),
-        ("get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}),
-        ("delete_movie", {"movie_idx": 1}),
-        ("get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}),
-        ("get_movies", {"expect_count": 1}),
-        ("logout", {}), ("exit", {}), 
-    ],
-    "collections": [
-        ("login_admin", {}),  # use CLI-provided admin
-        ("add_user", {}), ("get_users", {}),
-        ("logout_admin", {}),
-        ("login", {}), ("get_access", {}),
-        ("get_movies", {"expect_count": 0}),
-        ("get_collections", {"expect_count": 0}),
-        ("add_movie", {"movie_obj": SAMPLE_MOVIES[0]}),
-        ("add_movie", {"movie_obj": SAMPLE_MOVIES[1]}),
-        ("add_movie", {"movie_obj": SAMPLE_MOVIES[2]}),
-        ("get_movies", {"expect_count": 3}),
-        ("add_collection", {"collection_obj": {"title": "Top IMDB", "movie_idx": [0, 2]}}),
-        ("add_collection", {"collection_obj": {"title": "Must See", "movie_idx": [1, 2]}}),
-        ("get_collections", {"expect_count": 2, "expect_titles": ["Top IMDB", "Must See"]}),
-        ("get_collection", {"collection_idx": 0, "expect_collection": {"title": "Top IMDB"},
-                            "expect_movies": [SAMPLE_MOVIES[0]["title"],
-                                              SAMPLE_MOVIES[2]["title"]]}),
-        ("delete_collection", {"collection_idx": 1}),
-        ("get_collections", {"expect_count": 1, "expect_titles": ["Top IMDB"]}),
-        ("logout", {}), ("exit", {}), 
-    ],
-
-    # cleans up all test_* users from your account
-    "CLEANUP": [
-        ("login_admin", {}),
-        ("get_users", {}), ("delete_all_users", { "delete_pattern": r"^test_.+" }),
-        ("logout_admin", {}),
-    ],
-    # interactive shell
-    "SHELL": [
-        ("login_admin", {}),
-        ("add_user", {}), ("get_users", {}),
-        ("logout_admin", {}),
-        ("login", {}), ("get_access", {}),
-        ("shell", {}),
-        ("logout", {}), ("exit", {}), 
-    ],
-}
+def load_tests(tests_file):
+    global T
+    with open(tests_file, "r") as f:
+        T = yaml.safe_load(f)
 
 def run_tasks(p, args):
+    PROPAGATE_FIELDS = ["_user_ensured"]
     script_name = args.get("script")
     if not script_name:
         script_name = "full"
-    if script_name not in SCRIPTS:
-        raise CheckerException("Invalid script: %s" % (script_name))
-    script = SCRIPTS[script_name]
-    xargs = dict(args)
+    if not isinstance(script_name, list):
+        if script_name not in T["scripts"]:
+            raise CheckerException("Invalid script: %s" % (script_name))
+        script = T["scripts"][script_name]
+    else:
+        script = script_name
+    parent_xargs = args
+    xargs = parent_xargs
     for task in script:
         ignore = xargs.get("ignore", False)
         action = None
         action_name = ""
         print_style = {"fg": "cyan", "style": "bold"}
-        if isinstance(task, tuple):
+        if isinstance(task, (tuple, list)):
             action_name = task[0]
             action = ACTIONS[action_name]
             if task[1]:
@@ -442,18 +392,20 @@ def run_tasks(p, args):
             action_name = "<RUN SUBTASK: %s>" % str(task)
             print_style = {"fg": "black", "bg": "purple", "style": "bold"}
             action = run_tasks
-            ignore = True
-            xargs = dict(args, script=task, dont_exit=True)
+            xargs = dict(parent_xargs, script=task, dont_exit=True)
         if not action:
             continue
         try:
             color_print("%s: " % action_name, **print_style)
             action(p, xargs)
+            for field in PROPAGATE_FIELDS:
+                if field in xargs:
+                    parent_xargs[field] = xargs[field]
         except CheckerException as ex:
             ex = CheckerException("%s: %s" % (action.__name__, str(ex)))
             color_print(wrap_test_output("ERROR:"), fg="black", bg="red", stderr=True, newline=False)
             color_print(wrap_test_output(str(ex)), fg="red", stderr=True)
-            if args.get("debug"):
+            if parent_xargs.get("debug"):
                 color_print(wrap_test_output(traceback.format_exc()), fg="red", stderr=True)
             if not ignore:
                 break
@@ -463,7 +415,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='checker.py',
                                      description='Python helper for PCom / HTTP Assignment')
     parser.add_argument('program')
-    parser.add_argument('--script', choices=SCRIPTS.keys())
+    parser.add_argument('--test-file', help="Specify a custom tests yaml file",
+                        default="sample-tests.yaml")
+    parser.add_argument('--script', default="full")
     parser.add_argument('-a', '--admin', dest="admin_user", help="Specify admin username & password " \
         "(separated by colon, e.g. `-a admin_user:password`)")
     parser.add_argument('-u', '--user', dest="normal_user", help="Override normal username & password " \
@@ -478,6 +432,7 @@ if __name__ == "__main__":
         p.logfile_read = ExpectInputWrapper(direction=False)
 
     try:
+        load_tests(args.test_file)
         xargs = vars(args)
         xargs["admin_user"] = normalize_user("admin_user", xargs.get("admin_user"))
         xargs["normal_user"] = normalize_user("normal_user", xargs.get("normal_user"), True)
