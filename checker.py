@@ -417,7 +417,7 @@ def load_tests(tests_file):
 
 def run_tasks(p, args):
     PROPAGATE_FIELDS = ["_user_ensured", "_total_score"]
-    CLEANUP_FIELDS = ["score", "fail_score"]
+    CLEANUP_FIELDS = ["script", "score", "fail_score", "test_admin", "test_user"]
     script_name = args.get("script")
     if not script_name:
         script_name = "full"
@@ -445,7 +445,7 @@ def run_tasks(p, args):
             action_name = "<RUN SUBTASK: %s>" % str(task)
             print_style = {"fg": "black", "bg": "purple", "style": "bold"}
             action = run_tasks
-            xargs = dict(parent_xargs, script=task, dont_exit=True)
+            xargs = dict(parent_xargs, script=task, dont_exit=True, _parent=str(task))
         if not action:
             continue
         try:
@@ -465,6 +465,8 @@ def run_tasks(p, args):
                     parent_xargs[field] = xargs[field]
 
         except CheckerException as ex:
+            if xargs.get("_parent") and not ignore:
+                raise
             ex = CheckerException("%s: %s" % (action.__name__, str(ex)))
             color_print(wrap_test_output("ERROR:"), fg="black", bg="red", stderr=True, newline=False)
             color_print(wrap_test_output(str(ex)), fg="red", stderr=True)
@@ -501,6 +503,7 @@ if __name__ == "__main__":
     try:
         load_tests(args.test_file)
         xargs = vars(args)
+        del xargs["program"]
         xargs["admin_user"] = normalize_user("admin_user", xargs.get("admin_user"))
         xargs["normal_user"] = normalize_user("normal_user", xargs.get("normal_user"), True)
         xargs["normal_user"]["admin_username"] = xargs["admin_user"]["username"]
