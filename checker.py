@@ -179,11 +179,11 @@ def do_delete_user(p, xargs):
 def do_get_users(p, xargs):
     p.sendline("get_users")
     buf = expect_flush_output(p)
-    xargs["user_objs"] = extract_list_items(buf)
+    user_objs = extract_list_items(buf)
     if xargs.get("debug"):
-        color_print(wrap_test_output("Extracted users: \n" + str(xargs["user_objs"])), fg="white")
+        color_print(wrap_test_output("Extracted users: \n" + str(user_objs)), fg="white")
     user_found = False
-    for obj in xargs["user_objs"]:
+    for obj in user_objs:
         user_params = obj[1].split(":")
         if user_params[0] == xargs["normal_user"]["username"]:
             user_found = True
@@ -195,7 +195,10 @@ def do_get_users(p, xargs):
         if user_found:
             raise CheckerException(
                 f"The '{xargs["normal_user"]["username"]}' user was not deleted!")
-    xargs["_user_ensured"] = user_found
+    return {
+        "user_objs": user_objs,
+        "_user_ensured": user_found,
+    }
 
 def do_delete_all_users(p, xargs):
     objs = xargs.get("user_objs")
@@ -234,20 +237,21 @@ def ensure_user_access(p, xargs):
     else:
         print(wrap_test_output("User already ensured!"))
     nxargs = dict(xargs, script=ensure_script, dont_exit=True)
-    run_tasks(p, nxargs)
+    return run_tasks(p, nxargs)
 
 def do_get_movies(p, xargs):
     p.sendline("get_movies")
     buf = expect_flush_output(p)
-    xargs["movie_objs"] = extract_list_items(buf)
+    movie_objs = extract_list_items(buf)
     if xargs.get("debug"):
-        color_print(wrap_test_output("Extracted movies: \n" + str(xargs["movie_objs"])), fg="white")
+        color_print(wrap_test_output("Extracted movies: \n" + str(movie_objs)), fg="white")
     expect_count = xargs.get("expect_count", False)
     if type(expect_count) is int:
-        if len(xargs["movie_objs"]) != expect_count:
+        if len(movie_objs) != expect_count:
             raise CheckerException("Movies count mismatch: %s != %s" % 
-                                   (len(xargs["movie_objs"]), expect_count))
+                                   (len(movie_objs), expect_count))
         color_print(wrap_test_output("PASSED: count=%i" % expect_count), fg="green", style="bold")
+    return { "movie_objs": movie_objs }
 
 def do_add_movie(p, xargs):
     existing_titles = [obj[1] for obj in xargs.get("movie_objs", [])]
@@ -302,21 +306,22 @@ def do_delete_all_movies(p, xargs):
 def do_get_collections(p, xargs):
     p.sendline("get_collections")
     buf = expect_flush_output(p)
-    xargs["collection_objs"] = extract_list_items(buf)
+    collection_objs = extract_list_items(buf)
     if xargs.get("debug"):
-        color_print(wrap_test_output("Extracted collections: \n" + str(xargs["collection_objs"])), fg="white")
+        color_print(wrap_test_output("Extracted collections: \n" + str(collection_objs)), fg="white")
     expect_count = xargs.get("expect_count", False)
     if type(expect_count) is int:
-        if len(xargs["collection_objs"]) != expect_count:
+        if len(collection_objs) != expect_count:
             raise CheckerException("Collections count mismatch: %s != %s" % 
-                                   (len(xargs["collection_objs"]), expect_count))
+                                   (len(collection_objs), expect_count))
         color_print(wrap_test_output("PASSED: count=%i" % expect_count), fg="green", style="bold")
     expect_titles = xargs.get("expect_title", None)
     if expect_titles:
-        existing_titles = [obj[1] for obj in xargs.get("collection_objs", [])]
+        existing_titles = [obj[1] for obj in collection_objs]
         for exp_title in expect_titles:
             if exp_title not in existing_titles:
                 raise CheckerException(f"Collection not found: '{exp_title}'")
+    return { "collection_objs": collection_objs }
 
 def do_add_collection(p, xargs):
     existing_titles = [obj[1] for obj in xargs.get("collection_objs", [])]
@@ -415,10 +420,9 @@ def load_tests(tests_file):
     with open(tests_file, "r") as f:
         T = yaml.safe_load(f)
 
-def run_tasks(p, args):
+def run_tasks(p, pargs):
     PROPAGATE_FIELDS = ["_user_ensured", "_total_score"]
-    CLEANUP_FIELDS = ["script", "score", "fail_score", "test_admin", "test_user"]
-    script_name = args.get("script")
+    script_name = pargs.get("script")
     if not script_name:
         script_name = "full"
     if not isinstance(script_name, list):
@@ -427,57 +431,63 @@ def run_tasks(p, args):
         script = T["scripts"][script_name]
     else:
         script = script_name
-    parent_xargs = args
-    parent_xargs.setdefault("_total_score", 0)
-    xargs = parent_xargs
+    res_args = {"_total_score": 0}
+    for field in PROPAGATE_FIELDS:
+        if field in pargs:
+            res_args[field] = pargs[field]
     for task in script:
-        ignore = xargs.get("ignore", False)
+        xargs = dict(pargs)
+        xargs.update(res_args)
         action = None
         action_name = ""
+        has_subtasks = False
         print_style = {"fg": "cyan", "style": "bold"}
         if isinstance(task, (tuple, list)):
             action_name = task[0]
             action = ACTIONS[action_name]
-            if task[1]:
+            if len(task) > 1 and task[1]:
                 xargs.update(task[1])
-            ignore = xargs.get("ignore", False)
         elif isinstance(task, str):
             action_name = "<RUN SUBTASK: %s>" % str(task)
+            has_subtasks = True
             print_style = {"fg": "black", "bg": "purple", "style": "bold"}
             action = run_tasks
-            xargs = dict(parent_xargs, script=task, dont_exit=True, _parent=str(task))
+            xargs = dict(xargs, script=task, dont_exit=True, _parent=str(task))
         if not action:
             continue
         try:
             color_print("%s: " % action_name, **print_style)
-            action(p, xargs)
+            res = action(p, xargs)
+            if res:
+                if has_subtasks:
+                    for field in PROPAGATE_FIELDS:
+                        if field in res:
+                            res_args[field] = res[field]
+                else:
+                    res_args.update(res)
             if xargs.get("score"):
-                xargs["_total_score"] += xargs["score"]
+                res_args["_total_score"] += xargs["score"]
                 color_print(
                     wrap_test_output("TEST PASSED! " f"score += {xargs["score"]}"),
                     fg="green",
                 )
-            for field in CLEANUP_FIELDS:
-                if field in xargs:
-                    del xargs[field]
-            for field in PROPAGATE_FIELDS:
-                if field in xargs:
-                    parent_xargs[field] = xargs[field]
 
         except CheckerException as ex:
-            if xargs.get("_parent") and not ignore:
+            if xargs.get("_parent") and not xargs.get("ignore"):
                 raise
             ex = CheckerException("%s: %s" % (action.__name__, str(ex)))
             color_print(wrap_test_output("ERROR:"), fg="black", bg="red", stderr=True, newline=False)
             color_print(wrap_test_output(str(ex)), fg="red", stderr=True)
-            if parent_xargs.get("debug"):
+            if xargs.get("debug"):
                 color_print(wrap_test_output(traceback.format_exc()), fg="red", stderr=True)
             if xargs.get("fail_score"):
-                parent_xargs["_total_score"] += xargs["fail_score"]
+                res_args["_total_score"] += xargs["fail_score"]
                 color_print(wrap_test_output(
                     f"PENALIZED: score -= {-xargs["fail_score"]}"), fg="red")
-            if not ignore:
+            if not xargs.get("ignore"):
                 break
+
+    return res_args
 
 
 if __name__ == "__main__":
@@ -509,9 +519,9 @@ if __name__ == "__main__":
         xargs["normal_user"]["admin_username"] = xargs["admin_user"]["username"]
         if args.debug:
             print("xargs: ", str(xargs))
-        run_tasks(p, xargs)
-        if "_total_score" in xargs:
-            color_print(f"\nChecker Finished!\nTotal: {round(xargs["_total_score"])}",
+        res_args = run_tasks(p, xargs)
+        if "_total_score" in res_args:
+            color_print(f"\nChecker Finished!\nTotal: {round(res_args["_total_score"])}",
                         fg="green", style="bold")
 
     except Exception as ex:
