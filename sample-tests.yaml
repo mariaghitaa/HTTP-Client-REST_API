@@ -61,6 +61,12 @@ scripts:
         "expect_movies": ["The Dark Knight", "The Lord of the Rings 1-3"]}]
     - ["delete_collection", {"score": 2.5, "collection_idx": 1}]
     - ["get_collections", {"score": 5, "expect_count": 1, "expect_titles": ["Top IMDB"]}]
+    # check add/delete movie collection item (5p)
+    - ["add_movie_to_collection", {"score": 1.5, "collection_idx": 0, "movie_idx": 1}]
+    - ["delete_movie_from_collection", {"score": 1.5, "collection_idx": 0, "movie_idx": 0}]
+    - ["get_collection", {"score": 2, "collection_idx": 0,
+        "expect_collection": {"title": "Top IMDB"},
+        "expect_movies": ["Idiocracy", "The Lord of the Rings 1-3"]}]
     - ["logout", {}]
     - ["exit", {}]
 

@@ -352,6 +352,26 @@ def do_delete_collection(p, xargs):
     expect_send_params(p, {"id": collection_id})
     expect_print_output(p)
 
+def do_add_movie_to_collection(p, xargs):
+    collection_id = get_object_id_by_idx("collection", xargs)
+    movie_id = get_object_id_by_idx("movie", xargs)
+    p.sendline("add_movie_to_collection")
+    expect_send_params(p, {
+        "collection_id": collection_id,
+        "movie_id": movie_id,
+    })
+    expect_print_output(p)
+
+def do_delete_movie_from_collection(p, xargs):
+    collection_id = get_object_id_by_idx("collection", xargs)
+    movie_id = get_object_id_by_idx("movie", xargs)
+    p.sendline("delete_movie_from_collection")
+    expect_send_params(p, {
+        "collection_id": collection_id,
+        "movie_id": movie_id,
+    })
+    expect_print_output(p)
+
 def do_exit(p, xargs):
     if xargs.get("dont_exit", False):
         return
@@ -373,6 +393,8 @@ ACTIONS = {
     "delete_movie": do_delete_movie, "delete_all_movies": do_delete_all_movies,
     "add_collection": do_add_collection, "get_collections": do_get_collections,
     "get_collection": do_get_collection, "delete_collection": do_delete_collection,
+    "add_movie_to_collection": do_add_movie_to_collection,
+    "delete_movie_from_collection": do_delete_movie_from_collection,
     "logout_admin": do_logout_admin, "logout": do_logout,
     "exit": do_exit, "shell": interactive_shell,
 }
