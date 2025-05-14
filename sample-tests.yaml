@@ -17,13 +17,13 @@ sample_movies:
     rating: 6.5
 
 scripts:
-  # this is the full test referncing all the others
-  full: ["users", "movies", "collections", "delete_user"]
+  # this is the full test suite referencing all the others
+  full: ["users", "movies", "collections", "delete_user", "finally_exit"]
   # you can invoke specific scripts using `--script TEST_NAME`
   users:
     - ["login_admin", {"score": 2.5}]
     - ["add_user", {"score": 5}]
-    - ["get_users", {"score": 2.5, "expect_user_exists": True}]
+    - ["get_users", {"score": 10, "expect_user_exists": True}]
     - ["logout_admin", {"score": 2.5}]
     - ["login", {"score": 2.5}]
     - ["get_access", {"score": 10}]
@@ -76,6 +76,7 @@ scripts:
     ["get_users", {"score": 5, "expect_user_deleted": true}], 
     ["logout_admin", {}], ["exit", {}] 
   ]
+  finally_exit: [["exit", {"score": 2.5}]]
 
   # use this script to clean all test_* users
   CLEANUP: [
