@@ -18,7 +18,7 @@ sample_movies:
 
 scripts:
   # this is the full test referncing all the others
-  full: ["users", "movies", "collections"]
+  full: ["users", "movies", "collections", "delete_user"]
   # you can invoke specific scripts using `--script TEST_NAME`
   users:
     - ["login_admin", {"score": 2.5}]
@@ -63,6 +63,13 @@ scripts:
     - ["get_collections", {"score": 5, "expect_count": 1, "expect_titles": ["Top IMDB"]}]
     - ["logout", {}]
     - ["exit", {}]
+
+  delete_user: [
+    ["login_admin", {}],
+    ["get_users", {}], ["delete_user", {}],
+    ["get_users", {"score": 5, "expect_user_deleted": true}], 
+    ["logout_admin", {}], ["exit", {}] 
+  ]
 
   # use this script to clean all test_* users
   CLEANUP: [

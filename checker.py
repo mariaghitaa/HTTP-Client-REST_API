@@ -191,6 +191,10 @@ def do_get_users(p, xargs):
         if not user_found:
             raise CheckerException(
                 f"The '{xargs["normal_user"]["username"]}' user was not found!")
+    if xargs.get("expect_user_deleted"):
+        if user_found:
+            raise CheckerException(
+                f"The '{xargs["normal_user"]["username"]}' user was not deleted!")
     xargs["_user_ensured"] = user_found
 
 def do_delete_all_users(p, xargs):
@@ -362,7 +366,7 @@ def interactive_shell(p, xargs):
 ACTIONS = {
     "login_admin": do_login_admin,
     "add_user": do_add_user, "get_users": do_get_users,
-    "delete_all_users": do_delete_all_users,
+    "delete_user": do_delete_user, "delete_all_users": do_delete_all_users,
     "login": do_login, "get_access": do_get_access,
     "ensure_user_access": ensure_user_access,
     "get_movies": do_get_movies, "get_movie": do_get_movie, "add_movie": do_add_movie,
