@@ -20,41 +20,50 @@ scripts:
   # this is the full test referncing all the others
   full: ["users", "movies", "collections"]
   # you can invoke specific scripts using `--script TEST_NAME`
-  users: [
-    ["login_admin", {}],
-    ["add_user", {}], ["get_users", {}],
-    ["logout_admin", {}],
-    ["login", {}], ["get_access", {}], ["logout", {}]
-  ]
-  movies: [
-    ["ensure_user_access", {}],
-    ["get_movies", {"expect_count": false}],
-    ["add_movie", {"movie_obj": *movie0}],
-    ["add_movie", {"movie_obj": *movie1}],
-    ["get_movies", {"expect_count": 2}],
-    ["get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}],
-    ["delete_movie", {"movie_idx": 1}],
-    ["get_movie", {"movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}],
-    ["get_movies", {"expect_count": 1}],
-    ["logout", {}], ["exit", {}]
-  ]
-  collections: [
-    ["ensure_user_access", {}],
-    ["get_movies", {"expect_count": None}],
-    ["get_collections", {"expect_count": 0}],
-    ["add_movie", {"movie_obj": *movie0}],
-    ["add_movie", {"movie_obj": *movie1}],
-    ["add_movie", {"movie_obj": *movie2}],
-    ["get_movies", {"expect_count": 3}],
-    ["add_collection", {"collection_obj": {"title": "Top IMDB", "movie_idx": [0, 2]}}],
-    ["add_collection", {"collection_obj": {"title": "Must See", "movie_idx": [1, 2]}}],
-    ["get_collections", {"expect_count": 2, "expect_titles": ["Top IMDB", "Must See"]}],
-    ["get_collection", {"collection_idx": 0, "expect_collection": {"title": "Top IMDB"},
-      "expect_movies": ["The Dark Knight", "The Lord of the Rings 1-3"]}],
-    ["delete_collection", {"collection_idx": 1}],
-    ["get_collections", {"expect_count": 1, "expect_titles": ["Top IMDB"]}],
-    ["logout", {}], ["exit", {}] 
-  ]
+  users:
+    - ["login_admin", {"score": 2.5}]
+    - ["add_user", {"score": 5}]
+    - ["get_users", {"score": 2.5, "expect_user_exists": True}]
+    - ["logout_admin", {"score": 2.5}]
+    - ["login", {"score": 2.5}]
+    - ["get_access", {"score": 10}]
+    - ["logout", {"score": 2.5}]
+
+  movies:
+    - ["ensure_user_access", {}]
+    - ["get_movies", {"score": 2.5, "expect_count": false}]
+    - ["add_movie", {"score": 2.5, "movie_obj": *movie0}]
+    - ["add_movie", {"score": 2.5, "movie_obj": *movie1}]
+    - ["get_movies", {"score": 2.5, "expect_count": 2}]
+    - ["get_movie", {"score": 2.5, "movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}]
+    - ["delete_movie", {"score": 5, "movie_idx": 1}]
+    - ["get_movie", {"score": 2.5, "movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}]
+    - ["get_movies", {"score": 5, "expect_count": 1}]
+    - ["logout", {}]
+    - ["exit", {}]
+
+  collections:
+    - ["ensure_user_access", {}]
+    - ["get_movies", {"expect_count": None}]
+    - ["get_collections", {"score": 2.5, "expect_count": 0}]
+    - ["add_movie", {"movie_obj": *movie0}]
+    - ["add_movie", {"movie_obj": *movie1}]
+    - ["add_movie", {"movie_obj": *movie2}]
+    - ["get_movies", {"fail_score": -5, "expect_count": 3}]
+    - ["add_collection", {"score": 2.5,
+        "collection_obj": {"title": "Top IMDB", "movie_idx": [0, 2]}}]
+    - ["add_collection", {"score": 2.5,
+        "collection_obj": {"title": "Must See", "movie_idx": [1, 2]}}]
+    - ["get_collections", {"score": 5, "expect_count": 2,
+        "expect_titles": ["Top IMDB", "Must See"]}]
+    - ["get_collection", {"score": 5, "collection_idx": 0,
+        "expect_collection": {"title": "Top IMDB"},
+        "expect_movies": ["The Dark Knight", "The Lord of the Rings 1-3"]}]
+    - ["delete_collection", {"score": 2.5, "collection_idx": 1}]
+    - ["get_collections", {"score": 5, "expect_count": 1, "expect_titles": ["Top IMDB"]}]
+    - ["logout", {}]
+    - ["exit", {}]
+
   # use this script to clean all test_* users
   CLEANUP: [
     ["login_admin", {}],

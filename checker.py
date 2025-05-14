@@ -187,6 +187,10 @@ def do_get_users(p, xargs):
         user_params = obj[1].split(":")
         if user_params[0] == xargs["normal_user"]["username"]:
             user_found = True
+    if xargs.get("expect_user_exists"):
+        if not user_found:
+            raise CheckerException(
+                f"The '{xargs["normal_user"]["username"]}' user was not found!")
     xargs["_user_ensured"] = user_found
 
 def do_delete_all_users(p, xargs):
@@ -375,7 +379,8 @@ def load_tests(tests_file):
         T = yaml.safe_load(f)
 
 def run_tasks(p, args):
-    PROPAGATE_FIELDS = ["_user_ensured"]
+    PROPAGATE_FIELDS = ["_user_ensured", "_total_score"]
+    CLEANUP_FIELDS = ["score", "fail_score"]
     script_name = args.get("script")
     if not script_name:
         script_name = "full"
@@ -386,6 +391,7 @@ def run_tasks(p, args):
     else:
         script = script_name
     parent_xargs = args
+    parent_xargs.setdefault("_total_score", 0)
     xargs = parent_xargs
     for task in script:
         ignore = xargs.get("ignore", False)
@@ -408,18 +414,32 @@ def run_tasks(p, args):
         try:
             color_print("%s: " % action_name, **print_style)
             action(p, xargs)
+            if xargs.get("score"):
+                xargs["_total_score"] += xargs["score"]
+                color_print(
+                    wrap_test_output("TEST PASSED! " f"score += {xargs["score"]}"),
+                    fg="green",
+                )
+            for field in CLEANUP_FIELDS:
+                if field in xargs:
+                    del xargs[field]
             for field in PROPAGATE_FIELDS:
                 if field in xargs:
                     parent_xargs[field] = xargs[field]
+
         except CheckerException as ex:
             ex = CheckerException("%s: %s" % (action.__name__, str(ex)))
             color_print(wrap_test_output("ERROR:"), fg="black", bg="red", stderr=True, newline=False)
             color_print(wrap_test_output(str(ex)), fg="red", stderr=True)
             if parent_xargs.get("debug"):
                 color_print(wrap_test_output(traceback.format_exc()), fg="red", stderr=True)
+            if xargs.get("fail_score"):
+                parent_xargs["_total_score"] += xargs["fail_score"]
+                color_print(wrap_test_output(
+                    f"PENALIZED: score -= {-xargs["fail_score"]}"), fg="red")
             if not ignore:
                 break
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='checker.py',
@@ -450,6 +470,10 @@ if __name__ == "__main__":
         if args.debug:
             print("xargs: ", str(xargs))
         run_tasks(p, xargs)
+        if "_total_score" in xargs:
+            color_print(f"\nChecker Finished!\nTotal: {round(xargs["_total_score"])}",
+                        fg="green", style="bold")
+
     except Exception as ex:
         color_print("FATAL ERROR:", fg="black", bg="red", stderr=True, newline=False)
         color_print(" " + str(ex), fg="red", stderr=True)
