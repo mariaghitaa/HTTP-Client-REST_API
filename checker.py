@@ -261,6 +261,16 @@ def do_add_movie(p, xargs):
     expect_send_params(p, movie_struct)
     expect_print_output(p)
 
+def do_update_movie(p, xargs):
+    movie_id = get_object_id_by_idx("movie", xargs)
+    movie_obj = xargs.get("movie_obj", {})
+    p.sendline("update_movie")
+    movie_struct = { key : movie_obj.get(key, "")
+        for key in ("title", "year", "description", "rating") }
+    movie_struct["id"] = movie_id
+    expect_send_params(p, movie_struct)
+    expect_print_output(p)
+
 def do_delete_movie(p, xargs):
     movie_id = get_object_id_by_idx("movie", xargs)
     p.sendline("delete_movie")
@@ -390,6 +400,7 @@ ACTIONS = {
     "login": do_login, "get_access": do_get_access,
     "ensure_user_access": ensure_user_access,
     "get_movies": do_get_movies, "get_movie": do_get_movie, "add_movie": do_add_movie,
+    "update_movie": do_update_movie,
     "delete_movie": do_delete_movie, "delete_all_movies": do_delete_all_movies,
     "add_collection": do_add_collection, "get_collections": do_get_collections,
     "get_collection": do_get_collection, "delete_collection": do_delete_collection,

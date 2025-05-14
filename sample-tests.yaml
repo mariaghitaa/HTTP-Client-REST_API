@@ -15,6 +15,11 @@ sample_movies:
     year: 2001
     description: It's the homework that's never started as takes longest to finish.
     rating: 6.5
+  - &snow-white
+    title: Snow White
+    year: 2025
+    description: Mickey Mouse has you at gunpoint.
+    rating: 1.6
 
 scripts:
   # this is the full test suite referencing all the others
@@ -34,11 +39,12 @@ scripts:
     - ["get_movies", {"score": 2.5, "expect_count": false}]
     - ["add_movie", {"score": 2.5, "movie_obj": *movie0}]
     - ["add_movie", {"score": 2.5, "movie_obj": *movie1}]
-    - ["get_movies", {"score": 2.5, "expect_count": 2}]
-    - ["get_movie", {"score": 2.5, "movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}]
-    - ["delete_movie", {"score": 5, "movie_idx": 1}]
-    - ["get_movie", {"score": 2.5, "movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}]
-    - ["get_movies", {"score": 5, "expect_count": 1}]
+    - ["get_movies", {"score": 7.5, "expect_count": 2}]
+    - ["get_movie", {"score": 5, "movie_idx": 0, "expect_movie": {"title": "The Dark Knight", "year": 2008}}]
+    - ["update_movie", {"score": 1, "movie_idx": 1, "movie_obj": *snow-white}]
+    - ["get_movie", {"score": 1.5, "movie_idx": 1, "expect_movie": *snow-white}]
+    - ["delete_movie", {"score": 2.5, "movie_idx": 1}]
+    - ["get_movies", {"score": 2.5, "expect_count": 1}]
     - ["logout", {}]
     - ["exit", {}]
 
