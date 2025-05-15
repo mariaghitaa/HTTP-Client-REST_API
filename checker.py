@@ -30,8 +30,8 @@ TEXT_INDENT = "    "
 RUNTIME_PENALIZATION = -10
 
 # Regex for parsing ERROR/SUCCESS command statuses
-RE_SUCCESS = re.compile(r"^.*((?:^|\W)succ?ess?).*$", re.IGNORECASE)
-RE_ERROR = re.compile(r"^.*((?:^|\W)err?oa?r|(?:^|\W)fail).*$", re.IGNORECASE)
+RE_SUCCESS = re.compile(r"^[ \t\f\v]*((?:^|\W)succ?ess?).*$", re.IGNORECASE | re.MULTILINE)
+RE_ERROR = re.compile(r"^[ \t\f\v]*((?:^|\W)err?oa?r).*$", re.IGNORECASE | re.MULTILINE)
 # Regexes for extracting useful information
 RE_EXTRACT_LIST_ITEM = r"^\s*(?:movie\s*)?#([0-9]+)(?:\s*:)?\s*(.+)\s*"
 RE_EXTRACT_OBJ_FIELD = r"^\s*%s[ \t\f\v]*[=:][ \t\f\v]*([^\r\n]+)\s*?|\"%s\"\s*:\s*(?:\"([^\"]+)|([0-9]+))"
