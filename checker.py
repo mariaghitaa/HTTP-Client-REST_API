@@ -22,7 +22,8 @@ import pexpect
 import yaml
 
 
-EXPECT_TIMEOUT = 1  # 1 second should be enough...
+EXPECT_TIMEOUT = 0.5  # this will get multiplied by EXPECT_WAIT_TRIES
+EXPECT_WAIT_TRIES = 10  # retries while waiting for a response from the program
 EXPECT_SEP = "="  # field separator for input
 TEXT_INDENT = "    "
 
@@ -101,31 +102,32 @@ def expect_send_params(p, xvars):
             raise CheckerException("Client did not ask the following fields: " + 
                                    ", ".join(set(keys) - xseen))
 
-def expect_flush_output(p, ignore_error=False):
-    i = p.expect([pexpect.TIMEOUT, pexpect.EOF, RE_ERROR])
-    buf = p.before
-    if i == 0 and p.before:
-        p.expect(r'.+')
-    if i == 2 and not ignore_error:
-        raise CheckerException(f"Program returned error: {p.after.strip()}")
+def expect_flush_output(p, xargs=None, should_print=False):
+    buf = ""
+    i = 0
+    while i < EXPECT_WAIT_TRIES:
+        res = p.expect([pexpect.TIMEOUT, RE_SUCCESS, RE_ERROR, re.compile(".+")])
+        if res == 0: # continue flushing until a TIMEOUT
+            i += 1
+            if buf:  # break if our buffer captured SOMETHING
+                break
+        else:
+            if res == 1:  # SUCCESS
+                color_args = {}
+                if not (xargs and xargs.get("expect_fail")):
+                    color_args = {"fg": "green"}
+                if should_print:
+                    color_print(wrap_test_output(p.after.strip()), **color_args)
+            elif res == 2: # ERROR
+                if not (xargs and xargs.get("ignore_error")):
+                    raise CheckerException(f"Program returned error: {p.after.strip()}")
+            elif should_print:
+                color_print(wrap_test_output(p.after.strip()))
+            buf += p.before + p.after
     return buf
 
 def expect_print_output(p, xargs=None):
-    res = p.expect([RE_SUCCESS, RE_ERROR, pexpect.TIMEOUT])
-    color_args = {}
-    text = p.after
-    if res == 0:
-        if not (xargs and xargs.get("expect_fail")):
-            color_args = {"fg": "green"}
-    elif res == 1:
-        if not xargs.get("ignore_error"):
-            raise CheckerException(f"Program returned error: {text.strip()}")
-        return  # don't print the error
-    else:
-        text = p.before or "<no output>"
-        if p.before:
-            p.expect(r'.+')
-    color_print(wrap_test_output(text.strip()), **color_args)
+    expect_flush_output(p, xargs=xargs, should_print=True)
 
 def extract_list_items(output):
     matches = re.findall(RE_EXTRACT_LIST_ITEM, output, re.I | re.M)
