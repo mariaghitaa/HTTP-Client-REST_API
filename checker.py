@@ -39,7 +39,10 @@ T = {"scripts": {}}
 
 class CheckerException(Exception):
     """ Class of checker-thrown exceptions. """
-    pass
+    def __init__(self, msg, partial_score=None, should_fail=False):
+        self.partial_score = partial_score
+        self.should_fail = should_fail
+        super().__init__(msg)
 
 def wrap_test_output(text, indent=TEXT_INDENT):
     return textwrap.indent(text, prefix=indent)
@@ -81,13 +84,16 @@ def normalize_user(user_type, user_data, randomize=False):
 
 def expect_send_params(p, xvars):
     keys = list(xvars.keys())
-    xpatterns =  [(r"(?i)\b(" + kw + r")\s*" + EXPECT_SEP + r"\s*") for kw in keys]
+    xpatterns = [RE_ERROR] + [(r"(?i)\b(" + kw + r")\s*" + EXPECT_SEP + r"\s*") for kw in keys]
     xseen = set()
     while xseen != set(keys):
         try:
             idx = p.expect(xpatterns)
-            p.sendline(str(xvars.get(keys[idx])))
-            xseen.add(keys[idx])
+            if idx == 0:
+                raise CheckerException(f"Program returned error: {p.after.strip()}")
+            else:
+                p.sendline(str(xvars.get(keys[idx - 1])))
+                xseen.add(keys[idx - 1])
         except pexpect.exceptions.TIMEOUT:
             raise CheckerException("Client did not ask the following fields: " + 
                                    ", ".join(set(keys) - xseen))
@@ -101,16 +107,17 @@ def expect_flush_output(p, ignore_error=False):
         raise CheckerException(f"Program returned error: {p.after.strip()}")
     return buf
 
-def expect_print_output(p, ignore_error=False):
+def expect_print_output(p, xargs=None):
     res = p.expect([RE_SUCCESS, RE_ERROR, pexpect.TIMEOUT])
     color_args = {}
     text = p.after
     if res == 0:
-        color_args = {"fg": "green"}
+        if not (xargs and xargs.get("expect_fail")):
+            color_args = {"fg": "green"}
     elif res == 1:
-        if not ignore_error:
+        if not xargs.get("ignore_error"):
             raise CheckerException(f"Program returned error: {text.strip()}")
-        color_args = {"fg": "red"}
+        return  # don't print the error
     else:
         text = p.before or "<no output>"
         if p.before:
@@ -158,23 +165,32 @@ def check_object_fields(obj, expected):
 
 def do_login_admin(p, xargs):
     p.sendline("login_admin")
-    expect_send_params(p, xargs["admin_user"])
-    expect_print_output(p)
+    admin_user = xargs["admin_user"]
+    if "test_admin" in xargs:
+        admin_user = xargs["test_admin"]
+    expect_send_params(p, admin_user)
+    expect_print_output(p, xargs)
 
 def do_add_user(p, xargs):
     p.sendline("add_user")
-    expect_send_params(p, {
+    user_obj = {
         "username": xargs["normal_user"]["username"], 
         "password": xargs["normal_user"]["password"]
-    })
-    expect_print_output(p)
+    }
+    if "test_user" in xargs:
+        user_obj = xargs["test_user"]
+    expect_send_params(p, user_obj)
+    expect_print_output(p, xargs)
 
 def do_delete_user(p, xargs):
     p.sendline("delete_user")
-    expect_send_params(p, {
+    user_obj = {
         "username": xargs["normal_user"]["username"], 
-    })
-    expect_print_output(p)
+    }
+    if "test_user" in xargs:
+        user_obj = xargs["test_user"]
+    expect_send_params(p, user_obj)
+    expect_print_output(p, xargs)
 
 def do_get_users(p, xargs):
     p.sendline("get_users")
@@ -212,31 +228,31 @@ def do_delete_all_users(p, xargs):
 
 def do_logout_admin(p, xargs):
     p.sendline("logout_admin")
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_login(p, xargs):
     p.sendline("login")
     expect_send_params(p, xargs["normal_user"])
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_logout(p, xargs):
     p.sendline("logout")
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_get_access(p, xargs):
     p.sendline("get_access")
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def ensure_user_access(p, xargs):
     ensure_script = [ ["login", {}], ["get_access", {}] ]
     if not xargs.get("_user_ensured", False):
         ensure_script = [
-            ["login_admin", {}], ["add_user", {}],
+            ["login_admin", {}], ["add_user", {"ignore": True, "ignore_error": True}],
             ["get_users", {}], ["logout_admin", {}],
         ] + ensure_script
     else:
         print(wrap_test_output("User already ensured!"))
-    nxargs = dict(xargs, script=ensure_script, dont_exit=True)
+    nxargs = dict(xargs, script=ensure_script, dont_exit=True, _parent="ensure_user_access")
     return run_tasks(p, nxargs)
 
 def do_get_movies(p, xargs):
@@ -263,7 +279,7 @@ def do_add_movie(p, xargs):
     movie_struct = { key : movie_obj.get(key, "")
         for key in ("title", "year", "description", "rating") }
     expect_send_params(p, movie_struct)
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_update_movie(p, xargs):
     movie_id = get_object_id_by_idx("movie", xargs)
@@ -273,13 +289,13 @@ def do_update_movie(p, xargs):
         for key in ("title", "year", "description", "rating") }
     movie_struct["id"] = movie_id
     expect_send_params(p, movie_struct)
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_delete_movie(p, xargs):
     movie_id = get_object_id_by_idx("movie", xargs)
     p.sendline("delete_movie")
     expect_send_params(p, {"id": movie_id})
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_get_movie(p, xargs):
     movie_id = get_object_id_by_idx("movie", xargs)
@@ -301,7 +317,7 @@ def do_delete_all_movies(p, xargs):
     for obj in objs:
         p.sendline("delete_movie")
         expect_send_params(p, {"id": obj[0]})
-        expect_print_output(p)
+        expect_print_output(p, xargs)
 
 def do_get_collections(p, xargs):
     p.sendline("get_collections")
@@ -339,7 +355,7 @@ def do_add_collection(p, xargs):
     for idx, movie_id in enumerate(movies_ids):
         collection_struct[r"movie_id\[\s*" + str(idx) + r"\s*\]"] = movie_id
     expect_send_params(p, collection_struct)
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_get_collection(p, xargs):
     collection_id = get_object_id_by_idx("collection", xargs)
@@ -365,7 +381,7 @@ def do_delete_collection(p, xargs):
     collection_id = get_object_id_by_idx("collection", xargs)
     p.sendline("delete_collection")
     expect_send_params(p, {"id": collection_id})
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_add_movie_to_collection(p, xargs):
     collection_id = get_object_id_by_idx("collection", xargs)
@@ -375,7 +391,7 @@ def do_add_movie_to_collection(p, xargs):
         "collection_id": collection_id,
         "movie_id": movie_id,
     })
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_delete_movie_from_collection(p, xargs):
     collection_id = get_object_id_by_idx("collection", xargs)
@@ -385,7 +401,7 @@ def do_delete_movie_from_collection(p, xargs):
         "collection_id": collection_id,
         "movie_id": movie_id,
     })
-    expect_print_output(p)
+    expect_print_output(p, xargs)
 
 def do_exit(p, xargs):
     if xargs.get("dont_exit", False):
@@ -396,6 +412,10 @@ def do_exit(p, xargs):
 def interactive_shell(p, xargs):
     p.setecho(True)
     p.interact()
+
+def do_set_args(p, xargs):
+    if xargs.get("_set_args"):
+        return xargs.get("_set_args")
 
 
 ACTIONS = {
@@ -413,6 +433,8 @@ ACTIONS = {
     "delete_movie_from_collection": do_delete_movie_from_collection,
     "logout_admin": do_logout_admin, "logout": do_logout,
     "exit": do_exit, "shell": interactive_shell,
+    # special actions
+    "_set": do_set_args,
 }
 
 def load_tests(tests_file):
@@ -455,39 +477,57 @@ def run_tasks(p, pargs):
             xargs = dict(xargs, script=task, dont_exit=True, _parent=str(task))
         if not action:
             continue
+        test_passed = False
+        no_score = False
         try:
             color_print("%s: " % action_name, **print_style)
             res = action(p, xargs)
+            if xargs.get("expect_fail"):
+                raise CheckerException(f"The '{action_name}' action should have failed!",
+                                       should_fail=True)
+            test_passed = True
             if res:
+                if res.get("_returned"):
+                    # prevent score printing for returned subtask collection
+                    no_score = True
                 if has_subtasks:
                     for field in PROPAGATE_FIELDS:
                         if field in res:
                             res_args[field] = res[field]
                 else:
                     res_args.update(res)
-            if xargs.get("score"):
-                res_args["_total_score"] += xargs["score"]
-                color_print(
-                    wrap_test_output("TEST PASSED! " f"score += {xargs["score"]}"),
-                    fg="green",
-                )
 
         except CheckerException as ex:
-            if xargs.get("_parent") and not xargs.get("ignore"):
-                raise
-            ex = CheckerException("%s: %s" % (action.__name__, str(ex)))
-            color_print(wrap_test_output("ERROR:"), fg="black", bg="red", stderr=True, newline=False)
-            color_print(wrap_test_output(str(ex)), fg="red", stderr=True)
-            if xargs.get("debug"):
-                color_print(wrap_test_output(traceback.format_exc()), fg="red", stderr=True)
-            if xargs.get("fail_score"):
-                res_args["_total_score"] += xargs["fail_score"]
-                color_print(wrap_test_output(
-                    f"PENALIZED: score -= {-xargs["fail_score"]}"), fg="red")
-            if not xargs.get("ignore"):
-                break
+            if xargs.get("expect_fail") and not ex.should_fail:
+                test_passed = True
+            else:
+                if xargs.get("_parent") and not xargs.get("ignore"):
+                    raise CheckerException(str(ex), partial_score=res_args.get("_total_score"))
+                ex = CheckerException("%s: %s" % (action.__name__, str(ex)))
+                color_print(wrap_test_output("ERROR:"), fg="black", bg="red", stderr=True, newline=False)
+                color_print(wrap_test_output(str(ex)), fg="red", stderr=True)
+                if xargs.get("debug"):
+                    color_print(wrap_test_output(traceback.format_exc()), fg="red", stderr=True)
+                if xargs.get("fail_score"):
+                    res_args["_total_score"] += xargs["fail_score"]
+                    color_print(wrap_test_output(
+                        f"PENALIZED: score -= {-xargs["fail_score"]}"), fg="red")
+                if not xargs.get("ignore"):
+                    break
 
-    return res_args
+        if test_passed and not no_score:
+            score_str = ""
+            if xargs.get("score"):
+                score_str = f"score += {xargs["score"]}"
+                res_args["_total_score"] += xargs["score"]
+            else:
+                score_str = "[no score change]"
+            color_print(
+                wrap_test_output(f"TEST PASSED! {score_str}"),
+                fg="green",
+            )
+
+    return dict(res_args, _returned=True)
 
 
 if __name__ == "__main__":
@@ -510,6 +550,7 @@ if __name__ == "__main__":
         p.logfile_send = ExpectInputWrapper(direction=True)
         p.logfile_read = ExpectInputWrapper(direction=False)
 
+    total_score = 0
     try:
         load_tests(args.test_file)
         xargs = vars(args)
@@ -521,12 +562,15 @@ if __name__ == "__main__":
             print("xargs: ", str(xargs))
         res_args = run_tasks(p, xargs)
         if "_total_score" in res_args:
-            color_print(f"\nChecker Finished!\nTotal: {round(res_args["_total_score"])}",
-                        fg="green", style="bold")
-
+            total_score = round(res_args["_total_score"])
     except Exception as ex:
         color_print("FATAL ERROR:", fg="black", bg="red", stderr=True, newline=False)
         color_print(" " + str(ex), fg="red", stderr=True)
         if args.debug:
             color_print(traceback.format_exc(), fg="red", stderr=True)
 
+        if isinstance(ex, CheckerException):
+            total_score = ex.partial_score
+
+    color_print(f"\nChecker Finished!\nTotal: {total_score}",
+                fg="green", style="bold")
