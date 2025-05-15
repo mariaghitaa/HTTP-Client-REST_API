@@ -26,6 +26,9 @@ EXPECT_TIMEOUT = 1  # 1 second should be enough...
 EXPECT_SEP = "="  # field separator for input
 TEXT_INDENT = "    "
 
+# penalization in case of checker runtime errors
+RUNTIME_PENALIZATION = -10
+
 # Regex for parsing ERROR/SUCCESS command statuses
 RE_SUCCESS = re.compile(r"^.*((?:^|\W)succ?ess?).*$", re.IGNORECASE)
 RE_ERROR = re.compile(r"^.*((?:^|\W)err?oa?r|(?:^|\W)fail).*$", re.IGNORECASE)
@@ -514,6 +517,10 @@ def run_tasks(p, pargs):
                         f"PENALIZED: score -= {-xargs["fail_score"]}"), fg="red")
                 if not xargs.get("ignore"):
                     break
+        except Exception as ex:
+            res_args["_total_score"] += RUNTIME_PENALIZATION
+            raise CheckerException(f"Unexpected runtime error: {ex}",
+                                   partial_score=res_args.get("_total_score"))
 
         if test_passed and not no_score:
             score_str = ""
