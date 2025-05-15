@@ -285,7 +285,10 @@ def do_add_movie(p, xargs):
     expect_print_output(p, xargs)
 
 def do_update_movie(p, xargs):
-    movie_id = get_object_id_by_idx("movie", xargs)
+    if "movie_id" in xargs:
+        movie_id = xargs.get("movie_id")
+    else:
+        movie_id = get_object_id_by_idx("movie", xargs)
     movie_obj = xargs.get("movie_obj", {})
     p.sendline("update_movie")
     movie_struct = { key : movie_obj.get(key, "")
@@ -295,13 +298,19 @@ def do_update_movie(p, xargs):
     expect_print_output(p, xargs)
 
 def do_delete_movie(p, xargs):
-    movie_id = get_object_id_by_idx("movie", xargs)
+    if "movie_id" in xargs:
+        movie_id = xargs.get("movie_id")
+    else:
+        movie_id = get_object_id_by_idx("movie", xargs)
     p.sendline("delete_movie")
     expect_send_params(p, {"id": movie_id})
     expect_print_output(p, xargs)
 
 def do_get_movie(p, xargs):
-    movie_id = get_object_id_by_idx("movie", xargs)
+    if "movie_id" in xargs:
+        movie_id = xargs.get("movie_id")
+    else:
+        movie_id = get_object_id_by_idx("movie", xargs)
     p.sendline("get_movie")
     expect_send_params(p, {"id": movie_id})
     buf = expect_flush_output(p)
@@ -349,19 +358,24 @@ def do_add_collection(p, xargs):
         color_print(wrap_test_output("SKIP: object already exists!"), fg="yellow")
         return
     p.sendline("add_collection")
+    movie_ids = collection_obj.get("movie_ids", None)
+    if movie_ids is None:
+        movie_ids = [get_object_id_by_idx("movie", xargs, idx=idx)
+            for idx in collection_obj.get("movie_idx", [])]
     collection_struct = {
         "title": collection_obj.get("title", ""),
-        "num_movies": len(collection_obj.get("movie_idx", [])),
+        "num_movies": len(movie_ids),
     }
-    movies_ids = [get_object_id_by_idx("movie", xargs, idx=idx)
-        for idx in collection_obj.get("movie_idx", [])]
-    for idx, movie_id in enumerate(movies_ids):
+    for idx, movie_id in enumerate(movie_ids):
         collection_struct[r"movie_id\[\s*" + str(idx) + r"\s*\]"] = movie_id
     expect_send_params(p, collection_struct)
     expect_print_output(p, xargs)
 
 def do_get_collection(p, xargs):
-    collection_id = get_object_id_by_idx("collection", xargs)
+    if "collection_id" in xargs:
+        collection_id = xargs.get("collection_id")
+    else:
+        collection_id = get_object_id_by_idx("collection", xargs)
     p.sendline("get_collection")
     expect_send_params(p, {"id": collection_id})
     buf = expect_flush_output(p)
@@ -381,7 +395,10 @@ def do_get_collection(p, xargs):
         color_print(wrap_test_output("PASSED: movies match!"), fg="green", style="bold")
 
 def do_delete_collection(p, xargs):
-    collection_id = get_object_id_by_idx("collection", xargs)
+    if "collection_id" in xargs:
+        collection_id = xargs.get("collection_id")
+    else:
+        collection_id = get_object_id_by_idx("collection", xargs)
     p.sendline("delete_collection")
     expect_send_params(p, {"id": collection_id})
     expect_print_output(p, xargs)

@@ -23,7 +23,7 @@ sample_movies:
 
 scripts:
   # this is the full test suite referencing all the others
-  full: ["users", "movies", "collections", "delete_user", "finally_exit"]
+  full: ["users", "movies", "collections", "failure_cases", "delete_user", "finally_exit"]
   # you can invoke specific scripts using `--script TEST_NAME`
   users:
     - ["login_admin", {"score": 2.5}]
@@ -81,6 +81,29 @@ scripts:
         "expect_movies": ["Idiocracy", "The Lord of the Rings 1-3"]}]
     - ["logout", {}]
     - ["exit", {}]
+
+  failure_cases:
+    # all further tests shall run regardless of success & fail with penalization
+    - ["login_admin", {}]
+    - ["_set", {"_set_args": {"ignore": true, "fail_score": -5, "expect_fail": true}}]
+    - ["add_user", {"test_user": {"username": "invalid user w spaces", "password": "failthis"}}]
+    - ["logout_admin", {"expect_fail": false}]
+    - ["ensure_user_access", {"expect_fail": false, "ignore": false}]
+    - ["delete_user", {"test_user": {"username":"<invalid user to del>"}}]
+    - ["get_movie", {"movie_id": 99999999}]
+    - ["add_movie", {"movie_obj": {
+        "title": "Rezolvare Tema 3 PCom",
+        "year": 2025, "description": "Git Gud!", rating: 12.99
+      }}]
+    - ["update_movie", {"movie_id": 99999999, "movie_obj": *snow-white}]
+    - ["delete_movie", {"movie_id": 99999999}]
+    - ["get_collection", {"collection_id": 99999999}]
+    - ["add_collection", {"collection_obj": {
+        "title": "Error d", "movie_ids": [99999999, 19999999]}
+      }]
+    - ["delete_collection", {"collection_id": 99999999}]
+    - ["logout", {"expect_fail": false, "ignore": true}]
+    - ["exit", {"expect_fail": false, "ignore": true}]
 
   delete_user: [
     ["login_admin", {}],
