@@ -211,11 +211,11 @@ def do_get_users(p, xargs):
     if xargs.get("expect_user_exists"):
         if not user_found:
             raise CheckerException(
-                f"The '{xargs["normal_user"]["username"]}' user was not found!")
+                f"The '{xargs['normal_user']['username']}' user was not found!")
     if xargs.get("expect_user_deleted"):
         if user_found:
             raise CheckerException(
-                f"The '{xargs["normal_user"]["username"]}' user was not deleted!")
+                f"The '{xargs['normal_user']['username']}' user was not deleted!")
     return {
         "user_objs": user_objs,
         "_user_ensured": user_found,
@@ -533,7 +533,7 @@ def run_tasks(p, pargs):
                 if xargs.get("fail_score"):
                     res_args["_total_score"] += xargs["fail_score"]
                     color_print(wrap_test_output(
-                        f"PENALIZED: score -= {-xargs["fail_score"]}"), fg="red")
+                        f"PENALIZED: score -= {-xargs['fail_score']}"), fg="red")
                 if not xargs.get("ignore"):
                     break
         except Exception as ex:
@@ -544,7 +544,7 @@ def run_tasks(p, pargs):
         if test_passed and not no_score:
             score_str = ""
             if xargs.get("score"):
-                score_str = f"score += {xargs["score"]}"
+                score_str = f"score += {xargs['score']}"
                 res_args["_total_score"] += xargs["score"]
             else:
                 score_str = "[no score change]"
