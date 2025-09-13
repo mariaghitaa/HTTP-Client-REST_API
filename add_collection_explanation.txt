@@ -1,0 +1,86 @@
+# Detailed Explanation of add_collection() Function
+
+## Function Purpose
+The `add_collection()` function allows a user to create a new collection of movies in the library. It handles the entire process of creating the collection, validating movie IDs, and adding valid movies to the newly created collection.
+
+## Implementation Details
+
+1. **Authentication and Authorization Verification**:
+   - The function begins by checking if the user is properly authenticated (cookie exists) and authorized (token exists).
+   - If either is missing, it displays an error message and exits, ensuring that only authorized users can create collections.
+
+2. **Collection Information Collection**:
+   - Prompts the user for a collection title.
+   - Validates that the title is not empty, displaying an error if it is.
+   - Asks for the number of movies to include in the collection.
+   - Collects the ID for each movie that should be part of the collection.
+
+3. **Movie ID Validation**:
+   - For each movie ID provided, the function verifies its existence by calling the `exist_film()` helper function.
+   - `exist_film()` works by:
+     - Constructing a URL for the specific movie using its ID
+     - Sending a GET request to that URL with the user's authentication and authorization credentials
+     - Checking if the server responds with an error (indicating the movie doesn't exist)
+     - Returning a boolean indicating whether the movie exists
+
+4. **Error Handling for Invalid Movies**:
+   - The function keeps track of both valid and invalid movie IDs.
+   - If no valid movies are found, it displays an error message and exits without creating the collection.
+   - If some invalid IDs are found (but at least one valid ID exists), it proceeds with collection creation but displays a warning about the invalid IDs.
+
+5. **Collection Creation**:
+   - Creates a JSON object containing the collection title.
+   - Sends a POST request to the collections endpoint with this JSON payload.
+   - Includes the session cookie and authorization token in the request.
+   - Processes the server response to determine if the collection was created successfully.
+
+6. **Adding Movies to the Collection**:
+   - If the collection is created successfully, the function extracts the new collection's ID from the JSON response.
+   - For each valid movie ID:
+     - Creates a JSON object containing the movie ID.
+     - Constructs a URL targeting the specific collection's movies endpoint.
+     - Sends a POST request to add the movie to the collection.
+     - Handles the response (although it doesn't currently verify success for each movie addition).
+
+7. **Memory Management**:
+   - Properly frees all allocated memory, including:
+     - JSON objects and serialized strings
+     - HTTP request and response strings
+     - Connection resources
+
+8. **Error Reporting**:
+   - Provides clear feedback messages at each step of the process.
+   - Reports specific errors for:
+     - Authentication/authorization issues
+     - Empty titles
+     - Invalid movie IDs
+     - Collection creation failures
+
+## Behavior with Invalid IDs
+When processing movie IDs:
+1. The function attempts to validate each ID by sending a request to the server.
+2. It categorizes IDs as valid or invalid based on the server's response.
+3. Invalid IDs (like 1000 or 1899) are collected and reported to the user.
+4. Only valid movies are actually added to the collection.
+5. This ensures that collections only contain real, accessible movies.
+
+## Technical Implementation Notes
+
+1. **Movie Validation Strategy**:
+   - The validation check uses a separate HTTP request for each movie ID, which is network-intensive but ensures accuracy.
+   - The function could be optimized to batch validate movie IDs if the API supported such functionality.
+
+2. **Error Handling Strategy**:
+   - The function uses a permissive approach - it creates the collection even if some movie IDs are invalid.
+   - This allows users to create collections even when they make minor mistakes in ID input.
+
+3. **JSON Processing**:
+   - The function uses the parson library for all JSON operations.
+   - It creates separate JSON objects for the collection creation and for each movie addition.
+   - This demonstrates proper use of the library for different operations.
+
+4. **Network Communication**:
+   - For each operation (collection creation, movie addition), a separate connection is opened and closed.
+   - This approach is simpler but less efficient than maintaining a persistent connection.
+
+This implementation demonstrates a thorough approach to creating collections, with proper validation, error handling, and user feedback at every step.

@@ -1,0 +1,70 @@
+# Detailed Explanation of get_access() Function
+
+## Function Purpose
+The `get_access()` function is responsible for obtaining a JWT (JSON Web Token) from the server, which grants the client access to the movie library resources. This token is required for all subsequent operations related to movies and collections.
+
+## Implementation Details
+
+1. **Authentication Verification**:
+   - The function begins by checking if the user is logged in (`is_user == false`).
+   - If not logged in, it displays an error message and exits.
+   - This ensures that only authenticated users can request access to the library.
+
+2. **HTTP Request Construction**:
+   - The function uses `compute_get_request()` to create an HTTP GET request.
+   - The request is directed to the `/api/v1/tema/library/access` endpoint.
+   - The session cookie is included in the request headers to maintain the user's session.
+   - No token is included at this stage since that's what we're trying to obtain.
+
+3. **Network Communication**:
+   - Opens a connection to the server using `open_connection()`.
+   - Sends the request using `send_to_server()`.
+   - Receives the server response with `receive_from_server()`.
+   - Closes the connection when done.
+
+4. **Cookie Management**:
+   - After receiving the response, the function calls `update_cookie()` to extract and update the session cookie.
+   - This ensures that any new cookie sent by the server is stored for future requests.
+   - This step explains why `get_access()` may succeed even after a user logout issue - if the cookie persists in the system, the server still recognizes the session.
+
+5. **Error Handling**:
+   - The function checks if the response contains an "error" string.
+   - If an error is found, it displays an appropriate message and exits the function.
+
+6. **JSON Response Processing**:
+   - If no error is detected, the function extracts the JSON data from the response using `basic_extract_json_response()`.
+   - It validates that the JSON string is not NULL, displaying an error message if extraction fails.
+
+7. **Token Extraction**:
+   - The function parses the JSON string using `json_parse_string()`.
+   - It navigates the JSON structure to find the "token" field.
+   - Proper error handling is implemented at each step of the parsing process.
+
+8. **Token Storage**:
+   - If a valid token is found, the function:
+     - Frees any existing token to prevent memory leaks.
+     - Duplicates the new token string using `strdup()` and stores it in the global `token` variable.
+     - Displays a success message.
+
+9. **Memory Management**:
+   - The function properly frees all allocated memory, including:
+     - The HTTP request message
+     - The server response
+     - Any JSON objects created during parsing
+
+## Behavior with Invalid IDs
+When testing with invalid IDs (like 1000 or 1899):
+- The `get_access()` function itself doesn't process film IDs.
+- However, when used in conjunction with other functions like `get_movie()`, the token obtained by `get_access()` allows the client to make requests about specific movies.
+- The server then responds with appropriate error messages for non-existent movie IDs.
+- The client correctly handles these error responses and displays meaningful messages to the user.
+
+## Cookie Persistence Issue
+The reason `get_access()` might succeed despite user logout issues is related to cookie handling:
+1. When a user logs in, the server creates a session and sends a cookie.
+2. This cookie is stored in the client's global `cookie` variable.
+3. If a logout operation fails or is incomplete, the cookie remains valid on the server.
+4. When `get_access()` is called, it sends the still-valid cookie.
+5. The server recognizes the cookie and grants a token even though the client might have attempted to logout.
+
+This behavior highlights the importance of proper session management and confirms the implementation's adherence to standard web authentication practices.

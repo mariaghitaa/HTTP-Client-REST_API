@@ -12,6 +12,7 @@ Dependencies:
 
 It is highly recommended to use a VirtualEnv, either by using the bundled
 Makefile or by manually installing the dependencies:
+
 ```sh
 # symply run:
 make
@@ -37,7 +38,7 @@ python3 checker.py --admin 'myadminuser:hunter2' ../path-to/client
 ```
 
 The default test script uses the admin user to create a random normal test user.
-This will ensure a clean slate while doing all other tests (since the server 
+This will ensure a clean slate while doing all other tests (since the server
 persists all edits inside a database).
 
 Alternately, you can use e.g., `--script CLEANUP` if you have a functioning
@@ -47,7 +48,7 @@ associated users & other database items.
 Also make sure to check out [the source code](./checker.py) for the
 actual details about the script(s) being tested.
 
-<span style="color: #A33">**Warning**: This _alpha version!_ script is just an 
+<span style="color: #A33">**Warning**: This _alpha version!_ script is just an
 instrument used by our team to automate the homework verification process.
 If any bugs affecting its effectiveness are found, we reserve the right to
 correct them at any time (you will be notified when this is the case).
