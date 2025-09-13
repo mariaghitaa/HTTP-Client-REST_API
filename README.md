@@ -1,57 +1,99 @@
-# PCom HTTP Client Checker
+GHITA MARIA - 321 CC
 
-This repository contains checker for the PCom HTTP client homework.
+    Implementarea temei a pornit de la fisierele din laboratorul 9: buffer.c, buffer.h, helpers.c, helpers.h, requests.h si requests.c
+a caror functii le am implementat la laborator, dar totodata am cerut si rezolvarea unui laborant pentru a fi convinsa de corectitudinea 
+implementarii functiilor. Am adaugat si compute_delete_request care creeaza o cerere HTTP  delete.
+In plus, similara cu compute_post_request, am facut si o functie compute_put_request pe care o folosesc in functia update_movie care ajuta la 
+actualizarea unui filmul curent.
+    Pentru a parsa raspunsurile de la server am folosit biblioteca parson utilizand fisierele "parson.c" si "parson.h" din linkul de github 
+dat in enuntul temei. Am ales parson intrucat mi s a parut mai usor de folosit si de asemenea am urmarit cateva tutoriale pentru a intelege 
+cum pot folosi functiile de baza pentru parsare.
+    Pentru a retine informatiile de autorizare am folosit o variabila globala in care am retinut token ul JWT. Pentru coockie de asemenea am folosit 
+o variabila globala in care am retinut cookie ul de sesiune, si l am actualizat la fiecare raspuns primit de la server cu ajutorul functiei update_cookie.
+Am folosit si doua variabile(flag uri) is_admin si is_logged_in pentru a verifica daca utilizatorul este logat si daca este admin. Aceste variabile sunt setate 
+in functie de raspunsul primit de la server.
+    Structura pe care am folosit o se bazeaza in mare parte pe cate o functie pentru fiecare comanda posibila. Prin urmare, in main am citit comanda si am apelat
+functia pentru executarea acesteia. Daca nu este o comanda valida voi printa un mesaj de "Unknown command". 
 
-## Prerequisites
+    Descrierea comenziilor si modul in care le am implementat:
+    
+    1. login_admin: Am implementat functia login_admin care apeleaza compute_post_request pentru a trimite cererea de logare catre server. 
+In aceasta functie am verificat mai intai daca exista deja un cookie (deci daca utilizatorul este deja logat), caz in care afisez un mesaj de eroare.
+Apoi citesc username ul si parola, creez un obiect json cu aceste date si trimit cererea post. Dupa primirea raspunsului, verific daca contine erori 
+si actualizez cookie ul de sesiune cu ajutorul functiei update_cookie. Daca nu exista erori, setez flag ul is_admin pe true pentru a indica faptul ca 
+utilizatorul este logat ca admin.
+    
+    2. add_user: Functia add_user permite adminului sa adauge un nou utilizator. Verific mai intai daca exista un cookie valid (daca adminul este logat, ceea ce e necesar),
+apoi citesc username ul si parola pentru noul utilizator. Construiesc un obiect json cu aceste date si trimit o cerere post catre endpoint ul corespunzator.
+Verific raspunsul pentru a afisa un mesaj de succes sau de eroare.
+    
+    3. get_users: In aceasta functie trimit o cerere get catre server pentru a obtine lista utilizatorilor. Similar cu celelalte functii, verific mai intai daca adminul este logat, 
+apoi trimit cererea incluzand cookie ul actualizat. Dupa primirea raspunsului, parsez json ul pentru a extrage informatiile despre fiecare utilizator. 
+Loop ul parcurge vectorul de utilizatori, afisand pentru fiecare utilizator un numar, username ul si parola.
+    
+    4. delete_user: Pentru stergerea unui utilizator, citesc username ul acestuia, construiesc url ul specific (care include username ul in path) si trimit o cerere  delete. 
+Am folosit functia snprintf pentru a construi url ul pentru a evita buffer overflow.
+    
+    5. logout_admin: Functia delogheaza adminul trimitand o cerere get catre endpoint ul de logout. Dupa primirea raspunsului, eliberez cookie ul si token ul, 
+resetez flag urile is_admin si is_user, si afisez un mesaj corespunzator. MA asigur ca exista un admin logat inainte de a incerca delogarea.
+    
+    6. login: Asemenea cu login_admin, aceasta functie autentifica un utilizator normal. Diferenta principala este ca seteaza flag ul is_user in loc de is_admin.
+Am inecrcat sa adaug destule verificari pentru a preveni autentificarea simultana a mai multor utilizatori.
+    
+    7. get_access:  Aceasta functie obtine un token JWT pentru accesul la biblioteca. Trimit o cerere get si parsez raspunsul pentru a extrage token ul.
+Token ul este salvat intr o variabila globala pentru a fi folosit in cererile ulterioare catre biblioteca. Verific flag ul is_user, nu cookie ul, pentru a determina daca
+utilizatorul este logat.
+    
+    8. get_movies:  Functia obtine lista tuturor filmelor din biblioteca. Trebuie verificat ca utilizatorul este autentificat si are acces la biblioteca (token valid).
+Dupa trimiterea cererii get, parsez json ul returnat pentru a extrage si afisa detaliile fiecarui film, conform cerintei. M am ocupat de gestionarea cazurilor de eroare,
+cum ar fi lipsa accesului sau probleme de parsare json.
+    
+    9.  delete_movie: Pentru stergerea unui film, citesc ID ul acestuia, construiesc url ul specific si trimit o cerere  delete. Important in implementare este includerea 
+token ului JWT in header ul Authorization, necesar pentru operatiunile cu biblioteca. De asemenea, verific raspunsul pentru a determina realizarea cu succes a operatiei.
+    
+    10. get_movie: Functia obtine informatii despre un anumir film, pentru care citesc ID ul, construiesc url ul si trimit o cerere get catre server, necesara fiind parsarea  json ului
+pentru a extrage toate detaliile filmului. Am folosit functiile din biblioteca parson a extrage titlul, anul, genul etc. Pentru campurile care contin vectori am folosit un loop pentru
+a parcurge si afisa toate elementele.
 
-Dependencies:
+    11. add_movie:  Functia permite adaugarea unui nou film in biblioteca. Trebuie facuta citirea tuturor detaliilor filmului de la utilizator (titlu, an, gen, etc.) si 
+crearea unui obiect json cu aceste date. Pentru campurile care implica vectori am folosit functii din parson pentru a crea si popula vectori json. 
+Trimit apoi o cerere post cu obiectul json ca payload. Necesara si importanta este validarea datelor de intrare pentru a evita erori.
+    
+    12. update_movie: Se actualizeaza un film existent. Pentru aceasta functie am folosit o cerere put catre url ul specific filmului. Citirea si procesarea e similara cu add_movie, 
+dar cu ID ul filmului respectiv.
+    
+    13. get_collections:  Obtine lista colectiilor de filme. Trimit o cerere, parsez raspunsul pentru a extrage detaliile fiecarei colectii. Implementarea include
+Pentru fiecare colectie, afisez titlul si ID urile filmelor continute.
+    
+    14. get_collection:  Functia obtine detalii despre o colectie specifica. Citesc ID ul colectiei, construiesc url ul si trimit o cerere get. LA fel ca get_collections,
+dar pentru o singura colectie. Implementarea include parsarea json ului pentru a extrage titlul colectiei si ID urile filmelor continute, apoi afisarea acestora.
+    
+    15. add_collection: Asigura crearea unei noi colectii de filme. Aceasta este una dintre cele mai complexe functii, deoarece se efectueaza mai multi pasi:
+- crearea colectiei cu un titlu
+- validarea ID urilor filmelor 
+- adaugarea filmelor valide in colectie (daca exista in biblioteca folosind functia exist_film)
+- afisez ID urile filmelor invalide si continui doar daca exista cel putin un film valid
+- dupa crearea colectiei, parsez raspunsul pentru a obtine ID ul colectiei noi, apoi trimit cereri post separate pentru a adauga fiecare film valid in colectie.
+    
+    16.  delete_collection: Sterge o colectie existenta. Citesc ID ul colectiei, construiesc url ul si trimit o cerere delete. Similar cu  delete_movie, dar pentru 
+colectii. Ne asiguram initial ca utilizatorul are acces la biblioteca, dupa ca operatia a avut succes.
+    
+    17. add_movie_to_collection: Adauga un film intr o colectie existenta. Citesc ID ul colectiei si ID ul filmului, construiesc url ul specific si trimit o cerere 
+post cu un obiect json care contine ID ul filmului. Utilizatorul trebuie sa aiba acces la biblioteca.
+    
+    18.  delete_movie_from_collection: Sterge un film dintr o colectie. Similar cu add_movie_to_collection, dar foloseste o cerere delete. Construiesc url ul care 
+include atat ID ul colectiei cat si ID ul filmului si trimit cererea.
+    
+    19. logout:  Delogheaza utilizatorul curent trimitand o cerere get catre endpoint ul de logout. Dupa primirea raspunsului, eliberez cookie ul si token ul,
+resetez flag urile is_admin si is_user, si afisez un mesaj corespunzator. Plec de la a ma asigura ca exista un utilizator logat inainte de a incerca delogarea.
+    
+    20. update_cookie: O functie pe care am creat o pentru a extrage si actualiza cookie ul de sesiune din raspunsurile HTTP. Cauta headerul "Set Cookie" in raspuns,
+extrage valoarea cookie ului si o salveaza in variabila globala. Atentie sporita la cazurile in care headerul nu exista sau cookie ul este invalid.
+    
+    21. exist_film: O functie auxiliara care verifica daca un film cu un anumit ID exista in biblioteca. Trimit o cerere get catre url ul specific filmului si determin
+existenta acestuia bazandu ma pe raspunsul primit. Functia returneaza 1 daca filmul exista si 0 in caz contrar. Aceasta este folosita de functia add_collection 
+pentru a valida ID urile filmelor.
 
-- Python >= 3.7;
-- [`pexpect`](https://pexpect.readthedocs.io/en/stable/) (third party package for console automation);
-- [`pyyaml`](https://pypi.org/project/PyYAML/) (third party package for YAML);
-
-It is highly recommended to use a VirtualEnv, either by using the bundled
-Makefile or by manually installing the dependencies:
-
-```sh
-# symply run:
-make
-# this will do the same as:
-python3 -mvenv .venv
-.venv/bin/python3 -mpip install -r requirements.txt
-# Note: you need to source activate each time you start a new terminal
-source .venv/bin/activate
-```
-
-### Usage
-
-Invoke the checker on your client's compiled executable:
-
-```sh
-# !!! don't forget to source .venv/bin/activate !!!
-# first, read the tool's internal help:
-python3 checker.py --help 
-# run the checker using default settings:
-python3 checker.py ../path/to/client
-# you MUST supply a valid admin user & password!
-python3 checker.py --admin 'myadminuser:hunter2' ../path-to/client
-```
-
-The default test script uses the admin user to create a random normal test user.
-This will ensure a clean slate while doing all other tests (since the server
-persists all edits inside a database).
-
-Alternately, you can use e.g., `--script CLEANUP` if you have a functioning
-implementation for `get_users` and `delete_user` to quickly cleanup your
-associated users & other database items.
-
-Also make sure to check out [the source code](./checker.py) for the
-actual details about the script(s) being tested.
-
-<span style="color: #A33">**Warning**: This _alpha version!_ script is just an
-instrument used by our team to automate the homework verification process.
-If any bugs affecting its effectiveness are found, we reserve the right to
-correct them at any time (you will be notified when this is the case).
-When in doubt, use the homework text as the rightful source of truth and use the
-Moodle Forum to ask any questions.
-</span>
+    In cadrul funciilor din requests.c din cadrul laboratorului am adaguat in antetul lor si token ul JWT pentru a l adaugat la constructia mesajului pentru server.
+ 
+    
